@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Rename Computer 
-# Version 2
-# Zac Reeves
-
 # Variables
 computerSerial=$(ioreg -l | grep IOPlatformSerialNumber | sed 's/"$//' | sed 's/.*"//')
 computerSerialShort=${computerSerial: -6}
