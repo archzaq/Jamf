@@ -1,0 +1,1 @@
+Assuming our management account was setup properly and has been granted a secure token, you can use this script to securely grant other users secure tokens.

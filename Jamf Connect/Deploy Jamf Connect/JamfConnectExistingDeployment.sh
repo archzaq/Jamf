@@ -3,16 +3,6 @@
 # Jamf Recon to force device into proper smart group
 /usr/local/bin/jamf recon
 
-adBind=$(dsconfigad -show)
-if [ -z "$adBind" ];
-then
-	echo "Not bound to AD"
-	echo "Binding to AD"
-	/usr/local/bin/jamf policy -event bindAD
-else
-	echo "Already bound to AD"
-fi
-
 # Locations of Jamf Connect components
 launch_agent="/Library/LaunchAgents/com.jamf.connect.plist"
 login_image="/usr/local/jamfconnect/login-background.jpeg"

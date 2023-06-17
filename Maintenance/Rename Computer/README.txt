@@ -1,0 +1,1 @@
+Renames a device to the SLU standard.
