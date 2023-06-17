@@ -1,1 +1,0 @@
-This script is to remove Jamf Connect from a device.
