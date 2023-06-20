@@ -32,3 +32,5 @@ then
 else
     echo "Jamf Connect not running"
 fi
+
+exit 0
