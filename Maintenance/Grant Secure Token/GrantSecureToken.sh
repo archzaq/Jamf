@@ -1,5 +1,9 @@
 #!/bin/bash
 
+##########################
+### Author: Zac Reeves ###
+##########################
+
 # Admin credentials
 adminUser=$4
 adminPassword=$5
