@@ -14,7 +14,7 @@ standardName="SLU-$serialShort"
 
 # Function to avoid repeating the scutil commands
 function rename_Device() {
-    /usr/sbin/scutil --set ComputerName $1
+	/usr/sbin/scutil --set ComputerName $1
 	/usr/sbin/scutil --set LocalHostName $1
 	/usr/sbin/scutil --set HostName $1
 	/usr/local/bin/jamf recon	
@@ -26,7 +26,7 @@ if [[ $currentName == *"Mac"* ]];
 then
 	echo "Current computer name contains 'Mac', \"$currentName\"."
 	echo "Renaming to \"$standardName\"."
-    rename_Device "$standardName"
+	rename_Device "$standardName"
 	exit 0
 # If the current device name already contains two hyphens,
 # rename it using the pre-existing prefix and the final six characters of the serial number,
@@ -44,7 +44,7 @@ then
 	echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
 	echo "Renaming to \"$newLongName\"."
 	rename_Device "$newLongName"
-    exit 0
+	exit 0
 # If the current device name already contains a hyphen,
 # rename it using the pre-existing prefix and the final six characters of the serial number,
 # exiting if the name is already correct.
@@ -61,7 +61,7 @@ then
 	echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
 	echo "Renaming to \"$newName\"."
 	rename_Device "$newName"
-    exit 0
+	exit 0
 # If the current device name fails to match any conditions,
 # rename it using the SLU standard.
 else
