@@ -43,9 +43,9 @@ echo $macRestart
 
 if [[ $macRestart == *"Restart"* ]];
 then
-	osascript -e 'tell app "System Events" to restart' &
+    osascript -e 'tell app "System Events" to restart' &
     echo "Sent restart command"
     exit 0
 else
-	exit 0
+    exit 0
 fi
