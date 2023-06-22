@@ -24,8 +24,8 @@ function rename_Device() {
 # rename it using the SLU standard.
 if [[ $currentName == *"Mac"* ]];
 then
-	echo "Computer name contains 'Mac'. $currentName."
-	echo "Renaming to $standardName."
+	echo "Current computer name contains 'Mac', \"$currentName\"."
+	echo "Renaming to \"$standardName\"."
     rename_Device "$standardName"
 	exit 0
 # If the current device name already contains two hyphens,
@@ -37,11 +37,12 @@ then
 	newLongName="${longPrefix}${serialShort}"
 	if [[ $currentName == $newLongName ]];
 	then
-		echo "Device already named correctly, exiting."
+		echo "Device already named correctly, \"$currentName\"."
+		echo "Exiting..."
 		exit 0
 	fi
-	echo "Computer name contains hyphens. $currentName with prefix $longPrefix."
-	echo "Renaming to $newLongName."
+	echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
+	echo "Renaming to \"$newLongName\"."
 	rename_Device "$newLongName"
     exit 0
 # If the current device name already contains a hyphen,
@@ -53,18 +54,19 @@ then
 	newName="${prefix}${serialShort}"
 	if [[ $currentName == $newName ]];
 	then
-		echo "Device already named correctly, exiting."
+		echo "Device already named correctly, \"$currentName\"."
+		echo "Exiting..."
 		exit 0
 	fi
-	echo "Computer name contains a hyphen. $currentName with prefix $prefix."
-	echo "Renaming to $newName."
+	echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
+	echo "Renaming to \"$newName\"."
 	rename_Device "$newName"
     exit 0
 # If the current device name fails to match any conditions,
 # rename it using the SLU standard.
 else
-	echo "Computer name met no criteria. $currentName."
-	echo "Renaming to $standardName."
+	echo "Current computer name matches no critera, \"$currentName\"."
+	echo "Renaming to \"$standardName\"."
 	rename_Device "$standardName"
 	exit 0
 fi
