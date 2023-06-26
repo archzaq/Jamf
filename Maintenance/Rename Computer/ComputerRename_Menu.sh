@@ -14,7 +14,7 @@ standardName="SLU-$serialShort"
 
 # Function to avoid repeating the scutil commands
 function rename_Device() {
-	/usr/sbin/scutil --set ComputerName $1
+    /usr/sbin/scutil --set ComputerName $1
 	/usr/sbin/scutil --set LocalHostName $1
 	/usr/sbin/scutil --set HostName $1
 	/usr/local/bin/jamf recon	
@@ -44,17 +44,16 @@ YOO
 		exit 0
 	fi
 	deptName="${dept}${serialShort}"
-	echo "Current computer name is \"$currentName\"."
 	echo "User chose the prefix \"$dept\"."
+	echo "Current computer name is \"$currentName\"."
 	echo "Renaming to \"$deptName\"."
     rename_Device "$deptName" # rename the device
-	exit 0
 }
 
 # Function to ask the user if they want to rename the device
 function rename_Ask() {
 	renamePrompt=$(osascript <<OOP
-	    set dialogResult to display dialog "This device name already contains a department prefix, would you like to choose a new one?\n\nCurrent Name: $currentName \n\nSelect \"Yes\" to continue, or \"Cancel\" to use the existing name." buttons {"Yes", "Cancel"} default button "Cancel" with title "SLU ITS: Device Rename" giving up after 300
+	    set dialogResult to display dialog "This device name already contains a department prefix, would you like to choose a new one?\n\nCurrent Name: $currentName \n\nSelect \"Yes\" to continue, or \"Cancel\" to use the existing prefix." buttons {"Yes", "Cancel"} default button "Cancel" with title "SLU ITS: Device Rename" giving up after 300
 	    if button returned of dialogResult is equal to "Yes" then
 	        return "User selected: Yes"
 	    else
@@ -70,6 +69,7 @@ OOP
 if [[ $currentName == *"Mac"* ]];
 then
 	department_Prompt
+	exit 0
 # If the current device name already contains two hyphens,
 # prompt the user if they want to choose a new prefix,
 # if so, prompt the user to choose their department prefix.
@@ -81,6 +81,7 @@ then
 	if [[ $renameAnswer == *"Yes"* ]];
 	then
 		department_Prompt
+		exit 0
 	else
 		echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
 		if [[ $currentName == $newLongName ]];
@@ -106,6 +107,7 @@ then
 	if [[ $renameAnswer == *"Yes"* ]];
 	then
 		department_Prompt
+		exit 0
 	else
 		echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
 		if [[ $currentName == $newName ]];
@@ -124,4 +126,5 @@ then
 # prompt the user to choose their department prefix.
 else
 	department_Prompt
+	exit 0
 fi
