@@ -45,8 +45,6 @@ kill_App(){
         quit_Prompt "$1" # Dialog box to inform the user which applications are open and need to be closed
         pkill -f "$1"
         echo "$1 process killed"
-    else
-        echo "$1 not running"
     fi
 }
 
@@ -56,8 +54,6 @@ function kill_CC() {
     then
         pkill -f "Creative Cloud"
         echo "Adobe Creative Cloud process killed"
-    else
-        echo "Adobe Creative Cloud not running"
     fi
 }
 
@@ -86,7 +82,7 @@ OOP
 # Dialog box to inform the user which applications are open and need to be closed
 function quit_Prompt() {
     quitPrompt=$(osascript <<OOP
-        set dialogResult to display dialog "$1 is currently running and needs to be closed. \n\nIf you have unsaved files, select \"Dismiss\". This dialog box will return in five minutes. If you need more time, select \"Dismiss\" again.\n\nOnce you have saved any open files, select \"Continue\"." buttons {"Continue", "Dismiss"} default button "Continue" with title "SLU ITS: Adobe Acrobat Install" giving up after 900
+        set dialogResult to display dialog "$1 has a process currently running and needs to be closed. \n\nIf you have unsaved files, select \"Dismiss\". This dialog box will return in five minutes. If you need more time, select \"Dismiss\" again.\n\nOnce you have saved any open files, select \"Continue\"." buttons {"Continue", "Dismiss"} default button "Continue" with title "SLU ITS: Adobe Acrobat Install" giving up after 900
         if button returned of dialogResult is equal to "Continue" then
             return "User selected: Continue"
         else
@@ -145,8 +141,7 @@ do
     then
         echo "Uninstalling $package..."
         sudo pkgutil --forget "$package"
-    fi
-    if [[ $package == *"adobe.reader"* ]];
+    elif [[ $package == *"adobe.reader"* ]];
     then
         echo "Uninstalling $package..."
         sudo pkgutil --forget "$package"
