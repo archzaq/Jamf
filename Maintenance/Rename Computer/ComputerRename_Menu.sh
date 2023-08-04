@@ -26,7 +26,7 @@ function department_Prompt() {
 		"ADM - Administration Arts and Sciences", "AT - Athletics", "BF - Business & Finance",\
 		"BIO - Biology", "BIOC - Biochemistry", "CADE - Center for Advanced Dental Education",\
 		"CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry",\
-		"CME - Continuing Medical Education(PAWS)", "COMPMED - Comparative Medicine ",\
+		"CME - Continuing Medical Education(PAWS)", "CMM - Communications", "COMPMED - Comparative Medicine ",\
 		"CSB - Cook School of Business", "CTO - Clinical Trial Office",\
 		"DPS - Department of Public Safety", "DUR - University Development",\
 		"EAS - Earth and Atmospheric Science", "EM - Enrollment Management", "ENG - English",\
@@ -38,7 +38,7 @@ function department_Prompt() {
 		"MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
 		"MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art",\
 		"PAR - Parks College", "PHARM - Pharmacology and Physiology",\
-		"PHY - Physics", "POL - Political Science", "PO - President's Office",\
+		"PHY - Physics", "POL - Political Science", "PO - President's Office", "PVST - Provost",\
 		"REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
 		"SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education",\
 		"SON - School of Nursing", "SPH - School of Public Health",\
@@ -54,7 +54,7 @@ YOO
 	if [[ "$dept" == *"false"* ]];
 	then
 		echo "User canceled the operation."
-		exit 1
+		exit 0
 	# Run the lab_Prompt function for lab devices
 	elif [[ "echo $department" == *"Lab"* ]];
 	then
@@ -105,7 +105,7 @@ YOO
 		exit 0
 	# Just in case
 	else
-		echo "Errored out"
+		echo "Error'd out"
 		exit 1
 	fi
 }
@@ -129,6 +129,7 @@ OOP
 if [[ $currentName == *"Mac"* ]];
 then
 	department_Prompt # department prompt function
+	
 # If the current device name already contains two hyphens,
 # prompt the user to select a new prefix,
 # if so, prompt the user to choose their department prefix.
