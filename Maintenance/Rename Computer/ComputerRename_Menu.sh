@@ -56,7 +56,7 @@ YOO
 		echo "User canceled the operation."
 		exit 0
 	# Run the lab_Prompt function for lab devices
-	elif [[ "echo $department" == *"Lab"* ]];
+	elif [[ "echo $department" == *"Lab Device"* ]];
 	then
 		lab_Prompt # lab prompt function
 	# Anyone that didnt cancel or select lab device, rename using chosen option
