@@ -1,5 +1,9 @@
 #!/bin/bash
 
+##########################
+### Author: Zac Reeves ###
+##########################
+
 # Check if file paths exist
 if [ ! -f /usr/local/bin/authchanger ] || [ ! -f /usr/local/lib/pam/pam_saml.so.2 ] || [ ! -d "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle" ];
 then
@@ -24,6 +28,7 @@ rm /Library/LaunchAgents/com.jamf.connect.plist
 rm -r "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle"
 rm -r "/Applications/Jamf Connect.app"
 rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
+rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
 rm -r "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
 
 if pgrep "Jamf Connect" >/dev/null;
