@@ -23,12 +23,12 @@ function department_Prompt() {
 	department=$(osascript <<YOO
 		set dropdownResult to choose from list \
 		{"1818 - 1818 Program", "AAS - African-American Studies", "AAF - Academic Affairs",\
-		"ADM - Administration Arts and Sciences", "AT - Athletics", "BF - Business & Finance",\
+		"ADM - Administration Arts and Sciences", "AT - Athletics", "ATC - Academic Tech Commons", "BF - Business & Finance",\
 		"BIO - Biology", "BIOC - Biochemistry", "CADE - Center for Advanced Dental Education",\
 		"CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry",\
 		"CME - Continuing Medical Education(PAWS)", "CMM - Communications", "COMPMED - Comparative Medicine ",\
-		"CSB - Cook School of Business", "CTO - Clinical Trial Office",\
-		"DPS - Department of Public Safety", "DUR - University Development",\
+		"CSB - Cook School of Business","CSD - Speech, Language, and Hearing Sciences", "CTO - Clinical Trial Office",\
+		"DPS - Department of Public Safety", "DUR - University Development","FPA - Fine & Performing Arts",\
 		"EAS - Earth and Atmospheric Science", "EM - Enrollment Management", "ENG - English",\
 		"EU - Clinical Skill", "EVT - Event Services", "FAC - Facilities",\
 		"GC - Office of General Counsel", "HIS - History", "HR - Human Resources",\
@@ -37,8 +37,8 @@ function department_Prompt() {
 		"MAR - Marketing & Communications", "MED - Medical School", "MM - Mission & Ministry",\
 		"MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
 		"MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art",\
-		"PAR - Parks College", "PHARM - Pharmacology and Physiology",\
-		"PHY - Physics", "POL - Political Science", "PO - President's Office", "PVST - Provost",\
+		"PAR - Parks College", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
+		"PHYS - Physics", "POL - Political Science", "PO - President's Office", "PVST - Provost", "PSY - Psychology",\
 		"REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
 		"SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education",\
 		"SON - School of Nursing", "SPH - School of Public Health",\

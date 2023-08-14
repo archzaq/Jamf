@@ -12,12 +12,12 @@ serialShort=${computerSerial: -6}
 # SLU standard naming scheme
 standardName="SLU-$serialShort"
 
-# Function to avoid repeating the scutil commands
+# Contains scutil commands
 function rename_Device() {
     /usr/sbin/scutil --set ComputerName $1
     /usr/sbin/scutil --set LocalHostName $1
     /usr/sbin/scutil --set HostName $1
-    /usr/local/bin/jamf recon	
+    /usr/local/bin/jamf recon
 }
 
 # If the current device name contains "Mac",

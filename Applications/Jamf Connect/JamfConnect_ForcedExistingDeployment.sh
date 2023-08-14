@@ -9,6 +9,7 @@ launch_agent="/Library/LaunchAgents/com.jamf.connect.plist"
 login_image="/usr/local/jamfconnect/login-background.jpeg"
 jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
 jamf_connect_app="/Applications/Jamf Connect.app"
+lock_file="/var/run/jamf_connect_install.lock"
 retry=0
 
 # Dialog box to inform user of the overall process taking place
@@ -29,6 +30,31 @@ OOP
     else
         echo "Log: Reprompting user with the first dialog box"
         user_Prompt
+    fi
+}
+
+# Allow the user to delay the install as they will need to restart upon its completion
+function restart_Prompt() {
+    restartPrompt=$(osascript <<OOP
+        set dialogResult to display dialog "After the install has completed, you will need to restart your device for the changes to take effect. \n\nIf you are still working, select \"Dismiss\". This dialog box will return in ten minutes. If you need more time, select \"Dismiss\" again.\n\nOnce you are ready to begin, select \"Continue\"." buttons {"Continue", "Dismiss"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
+        if button returned of dialogResult is equal to "Continue" then
+            return "User selected: Continue"
+        else
+            return dialogResult
+        end if
+OOP
+    )
+    restartAnswer=$(echo "$restartPrompt")
+    if [[ "$restartAnswer" == *"Continue"* ]];
+    then
+        echo "Log: User selected \"Continue\" to begin the installation of Jamf Connect and allow a restart"
+    elif [[ "$restartAnswer" == *"Dismiss"* ]];
+    then
+        echo "Log: User selected \"Dismiss\". Prompting again in ten minutes"
+        sleep 600
+        restart_Prompt
+    else
+        restart_Prompt
     fi
 }
 
@@ -90,29 +116,32 @@ OOP
 }
 
 
-#adBind=$(dsconfigad -show)
-#if [ -z "$adBind" ];
-#then
-#   echo "Not bound to AD"
-#   echo "Binding to AD"
-#   /usr/local/bin/jamf policy -event bindAD
-#else
-#   echo "Already bound to AD"
-#fi
-
+# runs the thang
 function main(){
-    echo "Log: Informing user of the Jamf Connect installation"
-    user_Prompt
+    if [ ! -f "$lock_file" ];
+    then
+        /usr/bin/touch "$lock_file"
+        trap 'rm -f "$lock_file"' EXIT
 
-    echo "Log: Running recon"
-    /usr/local/bin/jamf recon
+        echo "Log: Informing user of the Jamf Connect installation"
+        user_Prompt
+        
+        echo "Log: Asking the user if they are able to restart or if they want to delay the install"
+        restart_Prompt
 
-    echo "Log: Awaiting the alignment of various components"
-    connect_Check
-    echo "Log: Components aligned"
+        echo "Log: Running recon"
+        /usr/local/bin/jamf recon
 
-    echo "Log: Prompting user to restart"
-    device_Restart
+        echo "Log: Awaiting the alignment of various components"
+        connect_Check
+        echo "Log: Components aligned"
+
+        echo "Log: Prompting user to restart"
+        device_Restart
+    else
+        echo "Log: Lock file exists. Policy is already running"
+        exit 0
+    fi
 }
 
 main
