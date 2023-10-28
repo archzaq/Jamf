@@ -23,7 +23,7 @@ function department_Prompt() {
 	department=$(osascript <<YOO
 		set dropdownResult to choose from list \
 		{"1818 - 1818 Program", "AAS - African-American Studies", "AAF - Academic Affairs",\
-		"ADM - Administration Arts and Sciences", "AT - Athletics", "ATC - Academic Tech Commons", "BF - Business & Finance",\
+		"ADM - Administration Arts and Sciences", "AMS - American Studies", "AT - Athletics", "ATC - Academic Tech Commons", "BF - Business & Finance",\
 		"BIO - Biology", "BIOC - Biochemistry", "CADE - Center for Advanced Dental Education",\
 		"CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry",\
 		"CME - Continuing Medical Education(PAWS)", "CMM - Communications", "COMPMED - Comparative Medicine ",\
