@@ -30,6 +30,7 @@ rm -r "/Applications/Jamf Connect.app"
 rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
 rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
 rm -r "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
+rm -r "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg" 
 
 if pgrep "Jamf Connect" >/dev/null;
 then
