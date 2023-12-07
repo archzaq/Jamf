@@ -7,3 +7,6 @@ JamfConnect_ForcedExistingDeployment.sh:
 
 JamfConnect_Removal.sh:
     Removes Jamf Connect from a device.
+
+JamfConnect_UserPrompt.sh
+    Annoy folk into initiating the Jamf Connect install.
