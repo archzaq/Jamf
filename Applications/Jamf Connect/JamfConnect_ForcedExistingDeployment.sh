@@ -14,6 +14,7 @@ retry=0
 
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
+    out=0
     userPrompt=$(osascript <<OOP
         set dialogResult to display dialog "You are about to receive the latest version of Jamf Connect.\n\nYou will be prompted to restart your device after the install of Jamf Connect has completed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
         if button returned of dialogResult is equal to "Continue" then
@@ -24,12 +25,17 @@ function user_Prompt() {
 OOP
     )
     userAnswer=$(echo "$userPrompt")
+    ((out++))
     if [[ "$userAnswer" == *"Continue"* ]];
     then
         echo "Log: User selected \"Continue\" through the first dialog box"
-    else
+    elif [ "$out" -le 10 ];
+    then
         echo "Log: Reprompting user with the first dialog box"
         user_Prompt
+    else
+        echo "Log: User prompted 10 times, exiting..."
+        exit 1
     fi
 }
 
@@ -72,7 +78,7 @@ function connect_Check(){
             if [ $retry -eq 2 ];
             then
                 echo "Log: Process timed out twice, attempting to repair install.."
-                /usr/local/bin/jamf policy -event RepairJamfConnect
+                /usr/local/bin/jamf recon
                 repair_trigger=1
             elif [ $retry -eq 3 ];
             then
@@ -107,8 +113,8 @@ OOP
     if [[ $macRestartAnswer == *"Restart"* ]];
     then
         echo "Log: User selected \"Restart\". Sending restart command"
-        /sbin/shutdown -r now &
         echo "Log: Sent restart command"
+        /sbin/shutdown -r now
         exit 0
     else
         exit 0
