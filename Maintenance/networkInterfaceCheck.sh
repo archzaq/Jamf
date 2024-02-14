@@ -31,7 +31,7 @@ done
 
 if [ "$IPsFound" -eq 0 ];
 then
-    touch "/Library/Application Support/JAMF/Receipts/ethernetCheck_WiFi_NotFound.txt"
+    touch "/Library/Application Support/JAMF/Receipts/ethernetCheck_NoNetworks.txt"
     echo "Log: File created at: /Library/Application Support/JAMF/Receipts/ethernetCheck_NoNetworks.txt"
 elif [ "$IPsFound" -eq 1 ];
 then
