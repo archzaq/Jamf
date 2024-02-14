@@ -23,7 +23,7 @@ findIPs(){
     fi
 }
 
-for each in $(networksetup -listallhardwareports | awk '/en/ {print $2}');
+for each in $(networksetup -listallhardwareports | awk '/en/ && !/\(en/ {print $2}');
 do
     findWiFi "$each"
     findIPs "$each"
