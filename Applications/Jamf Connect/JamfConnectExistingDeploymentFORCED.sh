@@ -11,10 +11,10 @@ jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
 jamf_connect_app="/Applications/Jamf Connect.app"
 lock_file="/var/run/jamf_connect_install.lock"
 retry=0
+out=0
 
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
-    out=0
     userPrompt=$(osascript <<OOP
         set dialogResult to display dialog "You are about to receive the latest version of Jamf Connect.\n\nYou will be prompted to restart your device after the install of Jamf Connect has completed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
         if button returned of dialogResult is equal to "Continue" then
@@ -90,8 +90,6 @@ function connect_Check(){
             then
                 echo "Log: Process timed out, retrying"
             fi
-
-            connect_Check
         fi
     done
 }
