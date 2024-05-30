@@ -2,12 +2,13 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Date: 5-29-24      ###
-### Version: 1.4       ###
+### Date: 5-30-24      ###
+### Version: 1.7       ###
 ##########################
 
 managementAccount="$4"
 managementAccountPass="$5"
+managementAccountPath="/Users/$managementAccount"
 tempAccount="$6"
 tempAccountPassword="$7"
 loggedInUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -51,10 +52,10 @@ function admin_Check(){
 
     if [[ $groupList == *" admin "* ]];
     then
-        echo "Log: \"$account\" is an Admin"
+        echo "Log: \"$account\" is an admin"
         return 0
     else
-        echo "Log: \"$account\" is not an Admin"
+        echo "Log: \"$account\" is not an admin"
         return 1
     fi
 }
@@ -127,12 +128,33 @@ function assign_Token(){
     then
         /usr/sbin/sysadminctl -adminUser "$loggedInUser" -adminPassword "$loggedInUserPassword" -secureTokenOn "$managementAccount" -password "$managementAccountPass"
         echo "Log: Success!!"
-        /usr/bin/osascript -e "display dialog \"Management account was successfully granted a secure token!\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
+        return 0
 
     # If the test was not successful, exit
     else
         echo "Log: Error with sysadminctl command"
-        /usr/bin/osascript -e "display dialog \"Error! Management account has not been granted a secure token. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
+        return 1
+    fi
+}
+
+# Creates management account with a home folder with proper permissions
+function create_ManagementAccount() {
+    /usr/sbin/sysadminctl -addUser "$managementAccount" -password "$managementAccountPass" -home "$managementAccountPath" -admin -adminUser "$tempAccount" -adminPassword "$tempAccountPassword"
+    if account_Check "$managementAccount";
+    then
+        dirs=("Desktop" "Documents" "Downloads" "Library" "Movies" "Music" "Pictures" "Public")
+        for dir in "${dirs[@]}";
+        do
+            mkdir -p "$managementAccountPath/$dir"
+        done
+        chown -R "$managementAccount":staff "$managementAccountPath"
+        chmod -R 750 "$managementAccountPath"
+        chmod -R +a "group:everyone deny delete" "$managementAccountPath"
+        echo "Log: \"$managementAccount\" successfully created"
+        return 0
+    else
+        echo "Log: \"$managementAccount\" failed to be created"
+        return 1
     fi
 }
 
@@ -140,7 +162,7 @@ function assign_Token(){
 function gather_SecureToken_UserList() {
     secureTokenUserArray=()
     userList=""
-    for user in $(ls /Users/ | grep -v Shared);
+    for user in $(ls /Users/ | grep -vE '^(Shared|loginwindow|\..*)');
     do
         username=$(/usr/bin/basename "$user")
         if secure_Token_Check "$username";
@@ -181,7 +203,7 @@ function check_LoggedInUser_Ownership() {
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
     userPrompt=$(osascript <<OOP
-    set userPrompt to (display dialog "You are about to receive a SLU standard security application, CyberArk.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$icon" with title "$title" giving up after 900)
+    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$icon" with title "$title" giving up after 900)
     if button returned of userPrompt is equal to "Continue" then
         return "Continue"
     else
@@ -225,20 +247,16 @@ function main() {
         exit 1
     fi
 
-    # Gather list of secure token accounts to display if loggedInUser doesnt have one
-    gather_SecureToken_UserList
-    if ! check_LoggedInUser_Ownership;
-    then
-        exit 1
-    fi
-
     # Prompt user with the action to take place
     user_Prompt
 
     # If management account does not exist, create it
     if ! account_Check "$managementAccount";
     then
-        /usr/sbin/sysadminctl -addUser "$managementAccount" -password "$managementAccountPass" -home /Users/its_admin -admin -createHome -adminUser "$tempAccount" -adminPassword "$tempAccountPassword"
+        if ! create_ManagementAccount;
+        then
+            exit 1
+        fi
     fi
 
     # If management account is not an admin, assign it to admin group using temp account credentials
@@ -248,6 +266,13 @@ function main() {
         then
             exit 1
         fi
+    fi
+
+    # Gather list of secure token accounts to display if loggedInUser doesnt have one
+    gather_SecureToken_UserList
+    if ! check_LoggedInUser_Ownership;
+    then
+        exit 1
     fi
 
     # If management account doesnt have a secure token, grant one after making the loggedInUser a temporary admin
@@ -271,9 +296,11 @@ function main() {
 
     if final_Check "$managementAccount";
     then
-        /usr/local/bin/jamf policy -event CyberArk
+        /usr/bin/osascript -e "display dialog \"Excellent!\\n\\nBeginning installation of CyberArk now.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
+        #/usr/local/bin/jamf policy -event CyberArk
         exit 0
     else
+        /usr/bin/osascript -e "display dialog \"Error! Management account has not been granted a secure token. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
         exit 1
     fi
 }
