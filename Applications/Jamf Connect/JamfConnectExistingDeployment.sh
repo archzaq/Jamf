@@ -60,8 +60,6 @@ function connect_Check(){
             then
                 echo "Log: Process timed out, retrying"
             fi
-
-            connect_Check
         fi
     done
 }
@@ -90,17 +88,6 @@ OOP
         exit 0
     fi
 }
-
-
-#adBind=$(dsconfigad -show)
-#if [ -z "$adBind" ];
-#then
-#   echo "Not bound to AD"
-#   echo "Binding to AD"
-#   /usr/local/bin/jamf policy -event bindAD
-#else
-#   echo "Already bound to AD"
-#fi
 
 function main(){
     echo "Log: Informing user of the Jamf Connect installation"
