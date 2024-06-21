@@ -16,7 +16,7 @@ then
     echo "authchanger command not found"
 else
     # Reset authchanger
-    sudo /usr/local/bin/authchanger -reset
+    /usr/local/bin/authchanger -reset
 fi
 
 sleep 2
