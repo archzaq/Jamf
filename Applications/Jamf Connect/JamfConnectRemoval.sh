@@ -25,12 +25,12 @@ sleep 2
 rm /usr/local/bin/authchanger
 rm /usr/local/lib/pam/pam_saml.so.2
 rm /Library/LaunchAgents/com.jamf.connect.plist
+rm "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
+rm "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
+rm "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
+rm "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg"
 rm -r "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle"
 rm -r "/Applications/Jamf Connect.app"
-rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
-rm -r "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
-rm -r "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
-rm -r "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg" 
 
 if pgrep "Jamf Connect" >/dev/null;
 then
