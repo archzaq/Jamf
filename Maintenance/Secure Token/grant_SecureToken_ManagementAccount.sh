@@ -2,6 +2,7 @@
 
 ##########################
 ### Author: Zac Reeves ###
+###      OUTDATED      ###
 ##########################
 
 # Prompt user for their password
