@@ -2,8 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Date: 5-30-24      ###
-### Version: 1.7       ###
+### Created: 6-6-24    ###
+### Updated: 6-20-24   ###
+### Version: 2.1       ###
 ##########################
 
 managementAccount="$4"
@@ -15,6 +16,24 @@ loggedInUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindo
 loggedInUserPassword=''
 title="SLU ITS: CyberArk Installation"
 icon="/usr/local/jamfconnect/SLU.icns"
+
+# Check if someone is logged into the device
+function login_Check() {
+    local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+
+    if [[ "$account" == 'root' ]];
+    then
+        echo "Log: \"$account\" currently logged in"
+        return 1
+    elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
+    then
+        echo "Log: No one logged in"
+        return 1
+    else
+        echo "Log: \"$account\" currently logged in"
+        return 0
+    fi
+}
 
 # Check for SLU icon, otherwise the osascript calls will fail
 function icon_Check() {
@@ -91,10 +110,11 @@ function secure_Token_Check() {
 
 # Prompt the user for their password, reprompting if they enter nothing or the dialog times out
 function password_Prompt(){
-    passTitle="SLU ITS: Password Prompt"
+    local passTitle="SLU ITS: Password Prompt"
     echo "Log: Prompting for password"
+
     loggedInUserPassword=$(/usr/bin/osascript <<OOP
-    set loggedInUserPassword to (display dialog "Please enter your computer password to continue with the installation:" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$icon" with title "$passTitle" giving up after 900)
+    set loggedInUserPassword to (display dialog "Please enter your computer password to continue with the installation:" buttons {"OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$icon" with title "$passTitle" giving up after 900)
     if button returned of loggedInUserPassword is equal to "OK" then
         return text returned of loggedInUserPassword
     else
@@ -102,15 +122,17 @@ function password_Prompt(){
     end if
 OOP
 	)
-    if [[ $? != 0 ]];
-    then
-        echo "Log: User selected cancel"
-        exit 0
-    elif [[ -z "$loggedInUserPassword" ]];
+    lowerPass=$(echo "$loggedInUserPassword" | tr '[:upper:]' '[:lower:]')
+    if [[ -z "$loggedInUserPassword" ]];
     then
         echo "Log: No password entered"
         /usr/bin/osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$passTitle\""
         password_Prompt
+    elif [[ "$lowerPass" == 'cancel' ]];
+    then
+        echo "Log: User used hidden exit"
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+        exit 1
     elif [[ "$loggedInUserPassword" == 'timeout' ]];
     then
         echo "Log: Timed out"
@@ -202,6 +224,12 @@ function check_LoggedInUser_Ownership() {
 
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
+    if [[ $promptCounter -ge 5 ]];
+    then
+        echo "Log: Prompted five times with no response, exiting"
+        return 1
+    fi
+
     userPrompt=$(osascript <<OOP
     set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$icon" with title "$title" giving up after 900)
     if button returned of userPrompt is equal to "Continue" then
@@ -214,8 +242,10 @@ OOP
     if [[ "$userPrompt" == 'Continue' ]];
     then
         echo "Log: User selected \"Continue\" through the first dialog box"
+        return 0
     else
         echo "Log: Reprompting user with the first dialog box"
+        ((promptCounter++))
         user_Prompt
     fi
 }
@@ -235,26 +265,42 @@ function final_Check() {
 }
 
 function main() {
+    promptCounter=0
+
+    # Ensure someone is logged into the GUI before running 
+    if ! login_Check;
+    then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+        exit 1
+    fi
+
     # Ensure SLU icon is present
     if ! icon_Check;
     then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
         exit 1
     fi
 
     # Ensure temp account is present
     if ! account_Check "$tempAccount";
     then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
         exit 1
     fi
 
     # Prompt user with the action to take place
-    user_Prompt
+    if ! user_Prompt;
+    then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+        exit 1
+    fi
 
     # If management account does not exist, create it
     if ! account_Check "$managementAccount";
     then
         if ! create_ManagementAccount;
         then
+            /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
             exit 1
         fi
     fi
@@ -264,6 +310,7 @@ function main() {
     then
         if ! add_Account_To_AdminGroup "$managementAccount";
         then
+            /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
             exit 1
         fi
     fi
@@ -272,6 +319,7 @@ function main() {
     gather_SecureToken_UserList
     if ! check_LoggedInUser_Ownership;
     then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
         exit 1
     fi
 
@@ -285,6 +333,10 @@ function main() {
                 password_Prompt
                 assign_Token
                 /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
+            else
+                echo "Log: Failed to add \"$loggedInUser\" to admin group"
+                /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+                exit 1
             fi
         else
             password_Prompt
@@ -292,16 +344,16 @@ function main() {
         fi
     fi
 
-    /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
-
+    # Final check to make sure management account is ready for CyberArk install
     if final_Check "$managementAccount";
     then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
         /usr/bin/osascript -e "display dialog \"Excellent!\\n\\nBeginning installation of CyberArk now.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
-        #/usr/local/bin/jamf policy -event CyberArk
+        /usr/local/bin/jamf policy -event CyberArk
         exit 0
     else
-        /usr/bin/osascript -e "display dialog \"Error! Management account has not been granted a secure token. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$icon\" with title \"$title\""
-        exit 1
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions." as critical buttons {"OK"} default button "OK"'
+        main
     fi
 }
 
