@@ -2,6 +2,7 @@
 
 ##########################
 ### Author: Zac Reeves ###
+###      OUTDATED      ###
 ##########################
 
 title='SLU ITS: MacOS Secure Token'
