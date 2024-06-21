@@ -2,10 +2,74 @@
 
 ##########################
 ### Author: Zac Reeves ###
+### Created: 1-23-24   ###
+### Updated: 6-21-24   ###
+### Version: 1.1       ###
 ##########################
 
 updateCount=0
 currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
+
+# Check for SLU icon file
+function icon_Check() {
+    if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
+    then
+        /usr/local/bin/jamf policy -event SLUFonts
+        if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
+        then
+        	echo "Log: No SLU icon installed, exiting."
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# Check if someone is logged into the device
+function login_Check() {
+    local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+
+    if [[ "$account" == 'root' ]];
+    then
+        echo "Log: \"$account\" currently logged in"
+        return 1
+    elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
+    then
+        echo "Log: No one logged in"
+        return 1
+    else
+        echo "Log: \"$account\" currently logged in"
+        return 0
+    fi
+}
+
+# Check for any OS updates and store them in $macOSAvailableUpgrades
+# Also counts how many updates available
+function update_Check() {
+    result=$(/usr/sbin/softwareupdate -l)
+    echo "Available updates:"
+    echo "$result"
+
+    macOSAvailableUpgrades=$(echo "$result" | grep "Label: macOS")
+    if [[ "$macOSAvailableUpgrades" == '' ]];
+    then
+        echo "Log: No updates available."
+	    osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
+        exit 0
+    fi
+    cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
+
+    echo "macOS updates:"
+    echo "$cleanUpdateList"
+    
+    # Loop through each line of $macOSAvailableUpgrades
+    while IFS= read -r line;
+    do
+        updateCount=$((updateCount + 1))
+    done <<< "$macOSAvailableUpgrades"
+
+    echo ""
+    echo "Total macOS updates available: $updateCount"
+}
 
 # Inform the user of how many updates they currently have
 function prompt_User() {
@@ -38,7 +102,7 @@ OOP
     fi
 }
 
-# Prompt the user for their password, reprompting if they enter nothing or the dialog times out
+# Prompt the user for their password, reprompting if they enter nothing
 function password_Prompt(){
 	echo "Prompting user for their password"
 	currentUserPassword=$(osascript <<OOP
@@ -53,7 +117,7 @@ OOP
     if [[ $? != 0 ]];
     then
         echo "Log: User selected cancel"
-        exit 0
+        return 1
 	elif [[ -z "$currentUserPassword" ]];
 	then
 	    echo "No password entered"
@@ -61,9 +125,32 @@ OOP
 	    password_Prompt
 	elif [[ "$currentUserPassword" == 'timeout' ]];
 	then
-    	echo "Log: Timed out, exiting..."
-		exit 0
+    	echo "Log: Timed out."
+		return 1
 	fi
+    return 0
+}
+
+# Get a list of secure token users to display in check_CurrentUser_Ownership with the $phrase variable
+function gather_SecureToken_UserList() {
+    secureTokenUserArray=()
+    userList=""
+    for user in $(ls /Users/);
+    do
+        username=$(basename "$user")
+        if sysadminctl -secureTokenStatus "$username" 2>&1 | grep -q 'ENABLED';
+        then
+            secureTokenUserArray+=("$username")
+        fi
+    done
+    if [[ -z "$secureTokenUserArray" ]];
+    then
+        userList="No secure token accounts available.\n\nPlease contact the IT Service Desk at (314)-977-4000."
+        phrase=$(echo "$userList")
+    else
+        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
+        phrase=$(echo -e "Log in as one of the following accounts:\n$userList")
+    fi
 }
 
 # Check current user for volume ownership
@@ -86,64 +173,26 @@ function check_CurrentUser_Ownership() {
     fi
 }
 
-function gather_SecureToken_UserList() {
-    secureTokenUserArray=()
-    userList=""
-    for user in $(ls /Users/);
-    do
-        username=$(basename "$user")
-        if sysadminctl -secureTokenStatus "$username" 2>&1 | grep -q 'ENABLED';
-        then
-            secureTokenUserArray+=("$username")
-        fi
-    done
-    if [[ -z "$secureTokenUserArray" ]];
-    then
-        userList="No secure token accounts available.\n\nPlease contact the IT Service Desk at (314)-977-4000."
-        phrase=$(echo "$userList")
-    else
-        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        phrase=$(echo -e "Log in as one of the following accounts:\n$userList")
-    fi
-}
-
 function main() {
-    if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
+    if ! icon_Check;
     then
-        /usr/local/bin/jamf policy
-        if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
-        then
-        	echo "Log: No SLU icon installed, exiting."
-            exit 1
-        fi
+        echo "Log: exiting for no SLU icon"
+        exit 1
     fi
-
-    result=$(/usr/sbin/softwareupdate -l)
-    echo "Available updates:"
-    echo "$result"
-
-    macOSAvailableUpgrades=$(echo "$result" | grep "Label: macOS")
-    if [[ "$macOSAvailableUpgrades" == '' ]];
-    then
-        echo "Log: No updates available."
-	    osascript -e "display dialog \"Your device is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        exit 0
-    fi
-    cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
-
-    echo "macOS updates:"
-    echo "$cleanUpdateList"
     
-    # Loop through each line of $macOSAvailableUpgrades
-    while IFS= read -r line;
-    do
-        updateCount=$((updateCount + 1))
-    done <<< "$macOSAvailableUpgrades"
+    if ! login_Check;
+    then
+        echo "Log: exiting for no user logged in"
+        exit 1
+    fi
 
-    echo ""
-    echo "Total macOS updates available: $updateCount"
+    update_Check
 
-    prompt_User
+    if ! prompt_User;
+    then
+        echo "Log: exiting at password prompt"
+        exit 1
+    fi
 
     if [ $(uname -p) = "arm" ];
     then
