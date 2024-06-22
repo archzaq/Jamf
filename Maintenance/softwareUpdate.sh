@@ -54,7 +54,7 @@ function update_Check() {
     then
         echo "Log: No updates available."
 	    osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        exit 0
+        return 1
     fi
     cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
 
@@ -69,6 +69,7 @@ function update_Check() {
 
     echo ""
     echo "Total macOS updates available: $updateCount"
+    return 0
 }
 
 # Inform the user of how many updates they currently have
@@ -186,7 +187,11 @@ function main() {
         exit 1
     fi
 
-    update_Check
+    if ! update_Check;
+    then
+        echo "Log: No updates available"
+        exit 0
+    fi
 
     if ! prompt_User;
     then
