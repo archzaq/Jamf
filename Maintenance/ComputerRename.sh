@@ -68,9 +68,9 @@ then
 # If the current device name fails to match any conditions,
 # rename it using the SLU standard.
 else
-	echo "Current computer name matches no critera, \"$currentName\"."
-	echo "Renaming to \"$standardName\"."
-	rename_Device "$standardName"
+    echo "Current computer name matches no critera, \"$currentName\"."
+    echo "Renaming to \"$standardName\"."
+    rename_Device "$standardName"
 fi
 
 exit 0
