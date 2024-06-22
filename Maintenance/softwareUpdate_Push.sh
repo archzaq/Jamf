@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 1-23-24   ###
+### Created: 6-21-24   ###
 ### Updated: 6-21-24   ###
-### Version: 1.2       ###
+### Version: 1.0       ###
 ##########################
 
 updateCount=0
@@ -72,6 +72,41 @@ function update_Check() {
     return 0
 }
 
+# Dialog box to inform user of the overall process taking place
+function user_Prompt() {
+    if [[ $promptCounter -ge 5 ]];
+    then
+        echo "Log: Prompted five times with no response, exiting"
+        return 1
+    fi
+
+    if [[ $(uname -p) == 'arm' ]];
+    then
+        prompt="\n\nYou will be prompted for your password before the installation may begin."
+    else
+        prompt=''
+    fi
+
+    userPrompt=$(osascript <<OOP
+    set userPrompt to (display dialog "You are about to receive an OS upgrade.$prompt\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    if button returned of userPrompt is equal to "Continue" then
+        return "Continue"
+    else
+        return "timeout"
+    end if
+OOP
+    )
+    if [[ "$userPrompt" == 'Continue' ]];
+    then
+        echo "Log: User selected \"Continue\" through the first dialog box"
+        return 0
+    else
+        echo "Log: Reprompting user with the first dialog box"
+        ((promptCounter++))
+        user_Prompt
+    fi
+}
+
 # Inform the user of how many updates they currently have
 function prompt_User() {
     promptMessage=""
@@ -84,7 +119,7 @@ function prompt_User() {
     fi
 
     userPrompt=$(osascript <<OOP
-    set dialogResult to (display dialog "$promptMessage" buttons {"Cancel", "Begin Download and Install"} default button "Cancel" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    set dialogResult to (display dialog "$promptMessage" buttons {"Begin Download and Install"} default button "Begin Download and Install" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
     if button returned of dialogResult is equal to "Begin Download and Install" then
         return "Begin Download and Install"
     else
@@ -92,22 +127,19 @@ function prompt_User() {
     end if
 OOP
     )
-    if [ -z "$userPrompt" ];
-    then
-        echo "Log: User selected cancel"
-        exit 0
-    elif [[ "$userPrompt" == "timeout" ]];
+    if [[ "$userPrompt" == "timeout" ]];
     then
         echo "Log: Timed out. Reprompting."
         prompt_User
     fi
+    return 0
 }
 
 # Prompt the user for their password, reprompting if they enter nothing
 function password_Prompt(){
-	echo "Prompting user for their password"
+	echo "Log: Prompting user for their password"
 	currentUserPassword=$(osascript <<OOP
-	    set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: Password Prompt" giving up after 900)
+	    set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: Password Prompt" giving up after 900)
 	    if button returned of currentUserPassword is equal to "OK" then
 	        return text returned of currentUserPassword
 	    else
@@ -115,11 +147,7 @@ function password_Prompt(){
 	    end if
 OOP
 	)
-    if [[ $? != 0 ]];
-    then
-        echo "Log: User selected cancel"
-        return 1
-	elif [[ -z "$currentUserPassword" ]];
+	if [[ -z "$currentUserPassword" ]];
 	then
 	    echo "No password entered"
 	    osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: Password Prompt\""
@@ -127,7 +155,11 @@ OOP
 	elif [[ "$currentUserPassword" == 'timeout' ]];
 	then
     	echo "Log: Timed out."
-		return 1
+        password_Prompt
+    elif [[ "$currentUserPassword" == 'cancel' ]];
+    then
+    	echo "Log: User canceled in password prompt"
+        return 1
 	fi
     return 0
 }
@@ -177,13 +209,13 @@ function check_CurrentUser_Ownership() {
 function main() {
     if ! icon_Check;
     then
-        echo "Log: exiting for no SLU icon"
+        echo "Log: Exiting for no SLU icon"
         exit 1
     fi
     
     if ! login_Check;
     then
-        echo "Log: exiting for no user logged in"
+        echo "Log: Exiting for no user logged in"
         exit 1
     fi
 
@@ -193,9 +225,15 @@ function main() {
         exit 0
     fi
 
-    if ! prompt_User;
+    if ! user_Prompt;
     then
-        echo "Log: exiting at password prompt"
+        echo "Log: Exiting at first user prompt"
+        exit 1
+    fi
+
+    if ! prompt_User; # currently doesnt return 1 anywhere
+    then
+        echo "Log: Exiting at second user prompt"
         exit 1
     fi
 
@@ -203,11 +241,17 @@ function main() {
     then
         gather_SecureToken_UserList
         check_CurrentUser_Ownership
-        password_Prompt
+        if ! password_Prompt;
+        then
+            echo "Log: Exiting at password prompt"
+            exit 1
+        fi
         echo "$currentUserPassword" | /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass
     else
         /usr/sbin/softwareupdate --verbose -iRr --agree-to-license
     fi
+
+    exit 0
 }
 
 main
