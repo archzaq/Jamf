@@ -2,6 +2,8 @@
 
 ##########################
 ### Author: Zac Reeves ###
+###      OUTDATED      ###
+###   CONVERT TO EA    ###
 ##########################
 
 wifiNetworkFound=0
