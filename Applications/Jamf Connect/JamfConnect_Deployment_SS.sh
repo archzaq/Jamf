@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 7-25-23   ###
-### Updated: 6-20-24   ###
-### Version: 1.1       ###
+### Updated: 6-21-24   ###
+### Version: 1.2       ###
 ##########################
 
 # Locations of Jamf Connect components
@@ -17,7 +17,7 @@ promptCount=0
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
     userPrompt=$(osascript <<OOP
-        set dialogResult to display dialog "You are about to receive the latest version of Jamf Connect.\n\nYou will be prompted to log out of you device after the install of Jamf Connect has completed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
+        set dialogResult to display dialog "You are about to receive the latest version of Jamf Connect.\n\nYou will be prompted to log out of your device after the install of Jamf Connect has completed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
         if button returned of dialogResult is equal to "Continue" then
             return "User selected: Continue"
         else
@@ -88,8 +88,8 @@ OOP
     if [[ $macLogOutAnswer == *"Log Out"* ]];
     then
         echo "Log: User selected \"Log Out\". Sending log out command"
-        echo "Log: Sent log out command"
         osascript -e 'tell application "System Events" to log out' &
+        echo "Log: Sent log out command"
         exit 0
     else
         osascript -e 'tell application "System Events" to log out' &
@@ -103,6 +103,7 @@ function main(){
 
     echo "Log: Running recon"
     /usr/local/bin/jamf recon
+    echo "Log: Recon complete"
 
     echo "Log: Awaiting the alignment of various components"
     connect_Check
