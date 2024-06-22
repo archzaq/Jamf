@@ -2,6 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
+### Created: 6-28-23   ###
+### Updated: 6-21-24   ###
+### Version: 1.4       ###
 ##########################
 
 # Information variables
