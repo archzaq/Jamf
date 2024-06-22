@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 6-1-23    ###
 ### Updated: 6-21-24   ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 # Information variables
@@ -42,11 +42,11 @@ then
     then
         echo "Device already named correctly, \"$currentName\"."
         echo "Exiting..."
-        exit 0
+    else
+        echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
+        echo "Renaming to \"$newLongName\"."
+        rename_Device "$newLongName"
     fi
-    echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
-    echo "Renaming to \"$newLongName\"."
-    rename_Device "$newLongName"
 
 # If the current device name already contains a hyphen,
 # rename it using the pre-existing prefix and the final six characters of the serial number,
@@ -59,11 +59,11 @@ then
     then
         echo "Device already named correctly, \"$currentName\"."
         echo "Exiting..."
-        exit 0
+    else
+        echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
+        echo "Renaming to \"$newName\"."
+        rename_Device "$newName"
     fi
-    echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
-    echo "Renaming to \"$newName\"."
-    rename_Device "$newName"
 
 # If the current device name fails to match any conditions,
 # rename it using the SLU standard.
