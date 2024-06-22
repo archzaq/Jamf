@@ -202,6 +202,7 @@ function check_CurrentUser_Ownership() {
     if [[ "$currentUserOwner" != true ]];
     then
         osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
+        echo "Log: \"$currentUser\" is not a volume owner, exiting."
         exit 0
     fi
 }
