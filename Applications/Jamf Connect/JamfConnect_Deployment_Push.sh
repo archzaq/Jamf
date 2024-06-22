@@ -114,8 +114,8 @@ OOP
     if [[ $macLogOutAnswer == *"Log Out"* ]];
     then
         echo "Log: User selected \"Log Out\". Sending log out command"
-        echo "Log: Sent log out command"
         osascript -e 'tell application "System Events" to log out' &
+        echo "Log: Sent log out command"
         exit 0
     else
         osascript -e 'tell application "System Events" to log out' &
