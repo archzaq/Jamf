@@ -175,62 +175,91 @@ OOP
 	echo "$renamePrompt"
 }
 
-# If the current device name contains "Mac",
-# prompt the user to choose their department prefix.
-if [[ $currentName == *"Mac"* ]];
-then
-    department_Prompt # department prompt function
-	
-# If the current device name already contains two hyphens,
-# prompt the user to select a new prefix,
-# if so, prompt the user to choose their department prefix.
-elif [[ $currentName == *-*-* ]];
-then
-    longPrefix=$(echo "$currentName" | sed 's/\(.*-\).*$/\1/')
-    newLongName="${longPrefix}${serialShort}"
-    renameAnswer=$(rename_Ask) # rename prompt function
-    if [[ $renameAnswer == *"Yes"* ]];
+# Check if someone is logged into the device
+function login_Check() {
+    local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+
+    if [[ "$account" == 'root' ]];
     then
-        department_Prompt # department prompt function
+        echo "Log: \"$account\" currently logged in"
+        return 1
+    elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
+    then
+        echo "Log: No one logged in"
+        return 1
     else
-        echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
-        if [[ $currentName == $newLongName ]];
-        then
-            echo "Device already named correctly, \"$currentName\"."
-            echo "Exiting..."
-        else
-            echo "Renaming to \"$newLongName\"."
-            rename_Device "$newLongName" # rename device function
-        fi
+        echo "Log: \"$account\" currently logged in"
+        return 0
+    fi
+}
+
+function main() {
+    if ! login_Check;
+    then
+        echo "Log: Exiting for no user logged in"
+        exit 1
     fi
 
-# If the current device name already contains a hyphen,
-# prompt the user if they want to choose a new prefix,
-# if so, prompt the user to choose their department prefix.
-elif [[ $currentName == *"-"* ]];
-then
-    prefix=$(echo "$currentName" | sed 's/\(.*-\).*/\1/')
-    newName="${prefix}${serialShort}"
-    renameAnswer=$(rename_Ask) # rename prompt function
-    if [[ $renameAnswer == *"Yes"* ]];
+    # If the current device name contains "Mac",
+    # prompt the user to choose their department prefix.
+    if [[ $currentName == *"Mac"* ]];
     then
         department_Prompt # department prompt function
-    else
-        echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
-        if [[ $currentName == $newName ]];
+        
+    # If the current device name already contains two hyphens,
+    # prompt the user to select a new prefix,
+    # if so, prompt the user to choose their department prefix.
+    elif [[ $currentName == *-*-* ]];
+    then
+        longPrefix=$(echo "$currentName" | sed 's/\(.*-\).*$/\1/')
+        newLongName="${longPrefix}${serialShort}"
+        renameAnswer=$(rename_Ask) # rename prompt function
+        if [[ $renameAnswer == *"Yes"* ]];
         then
-            echo "Device already named correctly, \"$currentName\"."
-            echo "Exiting..."
+            department_Prompt # department prompt function
         else
-            echo "Renaming to \"$newName\"."
-            rename_Device "$newName" # rename device function
+            echo "Current computer name contains hyphens, \"$currentName\" with prefix \"$longPrefix\"."
+            if [[ $currentName == $newLongName ]];
+            then
+                echo "Device already named correctly, \"$currentName\"."
+                echo "Exiting..."
+            else
+                echo "Renaming to \"$newLongName\"."
+                rename_Device "$newLongName" # rename device function
+            fi
         fi
+
+    # If the current device name already contains a hyphen,
+    # prompt the user if they want to choose a new prefix,
+    # if so, prompt the user to choose their department prefix.
+    elif [[ $currentName == *"-"* ]];
+    then
+        prefix=$(echo "$currentName" | sed 's/\(.*-\).*/\1/')
+        newName="${prefix}${serialShort}"
+        renameAnswer=$(rename_Ask) # rename prompt function
+        if [[ $renameAnswer == *"Yes"* ]];
+        then
+            department_Prompt # department prompt function
+        else
+            echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
+            if [[ $currentName == $newName ]];
+            then
+                echo "Device already named correctly, \"$currentName\"."
+                echo "Exiting..."
+            else
+                echo "Renaming to \"$newName\"."
+                rename_Device "$newName" # rename device function
+            fi
+        fi
+
+    # If the current device name fails to match any conditions,
+    # prompt the user to choose their department prefix.
+    else
+        department_Prompt # department prompt function
     fi
 
-# If the current device name fails to match any conditions,
-# prompt the user to choose their department prefix.
-else
-    department_Prompt # department prompt function
-fi
+    exit 0
+}
 
-exit 0
+main
+
