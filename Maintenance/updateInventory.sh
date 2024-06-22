@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 7-12-23   ###
 ### Updated: 6-20-24   ###
-### Version: 1.0       ###
+### Version: 1.1       ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
@@ -48,22 +48,17 @@ echo "Log: Updating inventory..."
 /usr/local/bin/jamf recon
 echo "Log: Inventory update complete, exiting..."
 
-if [[ $(/usr/bin/uname -p) = "arm" ]] && [[ ! $(/usr/bin/pgrep -q oahd) ]];
+if [[ $(/usr/bin/uname -p) = "arm" ]] && [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
 then
-    echo "Log: Rosetta not running, installing Rosetta"
+    echo "Log: Rosetta runtime not present, installing Rosetta"
     /usr/sbin/softwareupdate --install-rosetta --agree-to-license
     sleep 1
+    echo "Log: Checking for other missing enrollment policies"
     /usr/local/bin/jamf policy -event enrollmentComplete
-    if [ ! $(/usr/bin/pgrep -q oahd) ];
+    if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
     then
-        echo "Log: Rosetta still not running, trying again"
+        echo "Log: Rosetta runtime still not present, trying install again"
     	/usr/sbin/softwareupdate --install-rosetta --agree-to-license
-    fi
-    if $(/usr/bin/pgrep -q oahd);
-    then
-        echo "Log: Rosetta installed"
-    else
-        echo "Log: Rosetta not installed"
     fi
 fi
 
@@ -74,3 +69,4 @@ then
 fi
 
 exit 0
+
