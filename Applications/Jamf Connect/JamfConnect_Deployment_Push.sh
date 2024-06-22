@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 7-25-23   ###
-### Updated: 6-20-24   ###
-### Version: 1.5       ###
+### Updated: 6-21-24   ###
+### Version: 1.6       ###
 ##########################
 
 # Locations of Jamf Connect components
@@ -154,3 +154,4 @@ function main(){
 }
 
 main
+
