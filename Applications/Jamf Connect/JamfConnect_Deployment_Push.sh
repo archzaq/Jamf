@@ -139,6 +139,7 @@ function main(){
 
         echo "Log: Running recon"
         /usr/local/bin/jamf recon
+        echo "Log: Recon complete"
 
         echo "Log: Awaiting the alignment of various components"
         connect_Check
