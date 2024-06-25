@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
 ### Updated: 6-25-24   ###
-### Version: 1.5       ###
+### Version: 1.6       ###
 ##########################
 
 # Information variables
