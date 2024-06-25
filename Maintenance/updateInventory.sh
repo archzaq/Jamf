@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 7-12-23   ###
 ### Updated: 6-25-24   ###
-### Version: 1.6       ###
+### Version: 1.7       ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
@@ -75,7 +75,6 @@ fi
 
 
 
-
 sleep 1
 
 
@@ -84,10 +83,10 @@ echo "Log: $(date) Checking for correct naming" | tee -a "$logPath"
 
 if ! check_Name;
 then
-    echo "Log: $(date) Device name is \"$currentName\", renaming" | tee -a "$logPath"
+    echo "Log: $(date) Device name, $currentName, does not fit naming scheme" | tee -a "$logPath"
     /usr/local/bin/jamf policy -event rename
 else
-    echo "Log: $(date) Device name, \"$currentName\" fits naming scheme" | tee -a "$logPath"
+    echo "Log: $(date) Device name, $currentName, fits naming scheme" | tee -a "$logPath"
 fi
 
 echo "Log: $(date) Name check complete" | tee -a "$logPath"
@@ -107,7 +106,6 @@ then
 else
     echo "Log: $(date) Standard policy check complete" | tee -a "$logPath"
 fi
-
 
 
 
