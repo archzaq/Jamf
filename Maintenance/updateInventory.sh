@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 7-12-23   ###
 ### Updated: 6-25-24   ###
-### Version: 1.5       ###
+### Version: 1.6       ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
@@ -63,15 +63,16 @@ function check_Name() {
 
 
 
-echo "Log: $(date) Checking for lingering enrollment policies..." | tee "$logPath"
+echo "Log: $(date) Checking for lingering enrollment policies" | tee "$logPath"
 
 enrollment_check_result=$(/usr/local/bin/jamf policy -event enrollmentComplete)
 if ! check_already_running "$enrollment_check_result" "enrollmentComplete";
 then
-    echo "Log: $(date) Checked $maxAttempts times, giving up." | tee -a "$logPath"
+    echo "Log: $(date) Checked $maxAttempts times, giving up" | tee -a "$logPath"
+else
+    echo "Log: $(date) Enrollment policy check complete" | tee -a "$logPath"
 fi
 
-echo "Log: $(date) Enrollment policy check complete, continuing..." | tee -a "$logPath"
 
 
 
@@ -89,7 +90,7 @@ else
     echo "Log: $(date) Device name, \"$currentName\" fits naming scheme" | tee -a "$logPath"
 fi
 
-echo "Log: $(date) Name check complete, continuing..." | tee -a "$logPath"
+echo "Log: $(date) Name check complete" | tee -a "$logPath"
 
 
 
@@ -97,15 +98,16 @@ sleep 1
 
 
 
-echo "Log: $(date) Checking for remaining policies..." | tee -a "$logPath"
+echo "Log: $(date) Checking for remaining policies" | tee -a "$logPath"
 
 policy_check_result=$(/usr/local/bin/jamf policy)
 if ! check_already_running "$policy_check_result";
 then
-    echo "Log: $(date) Checked $maxAttempts times, giving up." | tee -a "$logPath"
+    echo "Log: $(date) Checked $maxAttempts times, giving up" | tee -a "$logPath"
+else
+    echo "Log: $(date) Standard policy check complete" | tee -a "$logPath"
 fi
 
-echo "Log: $(date) Standard policy check complete, continuing..." | tee -a "$logPath"
 
 
 
@@ -113,30 +115,33 @@ sleep 1
 
 
 
-echo "Log: $(date) Updating inventory..." | tee -a "$logPath"
+echo "Log: $(date) Updating inventory" | tee -a "$logPath"
 /usr/local/bin/jamf recon
-echo "Log: $(date) Inventory update complete, checking for Rosetta and Jamf Connect" | tee -a "$logPath"
+echo "Log: $(date) Inventory update complete" | tee -a "$logPath"
 
 
 
-if [[ $(/usr/bin/uname -p) = 'arm' ]] && [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
+if [[ $(/usr/bin/uname -p) = 'arm' ]];
 then
-    echo "Log: $(date) Rosetta runtime not present, installing Rosetta" | tee -a "$logPath"
-    /usr/sbin/softwareupdate --install-rosetta --agree-to-license
-
-    sleep 1
-
-    echo "Log: $(date) Checking for other missing enrollment policies" | tee -a "$logPath"
-    /usr/local/bin/jamf policy -event enrollmentComplete
-
-    if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
+    echo "Log: $(date) Checking for Rosetta runtime" | tee -a "$logPath"
+    if [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
     then
-        echo "Log: $(date) Rosetta runtime still not present, trying install again" | tee -a "$logPath"
-    	/usr/sbin/softwareupdate --install-rosetta --agree-to-license
+        echo "Log: $(date) Rosetta runtime not present, installing Rosetta" | tee -a "$logPath"
+        /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+
+        sleep 1
+
+        echo "Log: $(date) Checking for other missing enrollment policies" | tee -a "$logPath"
+        /usr/local/bin/jamf policy -event enrollmentComplete
+
+        if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
+        then
+            echo "Log: $(date) Rosetta runtime still not present, trying install again" | tee -a "$logPath"
+            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+        fi
+    else
+        echo "Log: $(date) Rosetta runtime present" | tee -a "$logPath"
     fi
-elif [[ $(/usr/bin/uname -p) = 'arm' ]];
-then
-    echo "Log: $(date) Rosetta runtime present" | tee -a "$logPath"
 fi
 
 

@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
-### Updated: 6-21-24   ###
-### Version: 1.4       ###
+### Updated: 6-25-24   ###
+### Version: 1.5       ###
 ##########################
 
 # Information variables
@@ -179,7 +179,7 @@ OOP
 function login_Check() {
     local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 
-    if [[ "$account" == 'root' ]];
+    if [[ "$account" == 'root' ]] || [[ "$account" == '_mbsetupuser' ]];
     then
         echo "Log: \"$account\" currently logged in"
         return 1
@@ -196,7 +196,7 @@ function login_Check() {
 function main() {
     if ! login_Check;
     then
-        echo "Log: Exiting for no user logged in"
+        echo "Log: Exiting for no valid user logged in"
         exit 1
     fi
 
@@ -236,20 +236,25 @@ function main() {
     then
         prefix=$(echo "$currentName" | sed 's/\(.*-\).*/\1/')
         newName="${prefix}${serialShort}"
-        renameAnswer=$(rename_Ask) # rename prompt function
-        if [[ $renameAnswer == *"Yes"* ]];
+        if [[ ! "$prefix" == 'SLU-' ]];
         then
-            department_Prompt # department prompt function
-        else
-            echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
-            if [[ $currentName == $newName ]];
+            renameAnswer=$(rename_Ask) # rename prompt function
+            if [[ $renameAnswer == *"Yes"* ]];
             then
-                echo "Device already named correctly, \"$currentName\"."
-                echo "Exiting..."
+                department_Prompt # department prompt function
             else
-                echo "Renaming to \"$newName\"."
-                rename_Device "$newName" # rename device function
+                echo "Current computer name contains a hyphen, \"$currentName\" with prefix \"$prefix\"."
+                if [[ $currentName == $newName ]];
+                then
+                    echo "Device already named correctly, \"$currentName\"."
+                    echo "Exiting..."
+                else
+                    echo "Renaming to \"$newName\"."
+                    rename_Device "$newName" # rename device function
+                fi
             fi
+        else
+            department_Prompt
         fi
 
     # If the current device name fails to match any conditions,
@@ -262,4 +267,3 @@ function main() {
 }
 
 main
-
