@@ -22,7 +22,7 @@ function check_already_running() {
     do
         if [[ $checkResult == *"already being run"* ]];
         then
-            echo "Log: $(date) Policy already being run, retrying in 30 seconds (Attempt $((attempt+1)))..." | tee -a "$logPath"
+            echo "Log: $(date) Policy already being run, retrying in 30 seconds (Attempt $((attempt+1)))" | tee -a "$logPath"
             sleep 30
             ((attempt++))
             if [[ ! -z "$event" ]];
@@ -146,6 +146,7 @@ fi
 
 
 
+echo "Log: $(date) Checking for Jamf Connect" | tee -a "$logPath"
 if [[ ! -d "$jamf_connect_app" ]] || [[ ! -f "$jamf_connect_plist" ]];
 then
     echo "Log: $(date) Missing Jamf Connect, installing" | tee -a "$logPath"
