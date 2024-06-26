@@ -3,12 +3,12 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 6-21-24   ###
-### Version: 1.2       ###
+### Updated: 6-26-24   ###
+### Version: 1.3       ###
 ##########################
 
-updateCount=0
-currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
+readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
+readonly logPath='/var/log/softwareUpdate.log'
 
 # Check for SLU icon file
 function icon_Check() {
@@ -17,7 +17,7 @@ function icon_Check() {
         /usr/local/bin/jamf policy -event SLUFonts
         if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
         then
-        	echo "Log: No SLU icon installed, exiting."
+            echo "Log: $(date "+%F %T") No SLU icon installed, exiting." | tee -a "$logPath"
             return 1
         fi
     fi
@@ -30,14 +30,14 @@ function login_Check() {
 
     if [[ "$account" == 'root' ]];
     then
-        echo "Log: \"$account\" currently logged in"
+        echo "Log: $(date "+%F %T") \"$account\" currently logged in" | tee -a "$logPath"
         return 1
     elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
     then
-        echo "Log: No one logged in"
+        echo "Log: $(date "+%F %T") No one logged in" | tee -a "$logPath"
         return 1
     else
-        echo "Log: \"$account\" currently logged in"
+        echo "Log: $(date "+%F %T") \"$account\" currently logged in" | tee -a "$logPath"
         return 0
     fi
 }
@@ -45,21 +45,22 @@ function login_Check() {
 # Check for any OS updates and store them in $macOSAvailableUpgrades
 # Also counts how many updates available
 function update_Check() {
+    updateCount=0
     result=$(/usr/sbin/softwareupdate -l)
-    echo "Available updates:"
-    echo "$result"
+    echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") $result" | tee -a "$logPath"
 
     macOSAvailableUpgrades=$(echo "$result" | grep "Label: macOS")
     if [[ "$macOSAvailableUpgrades" == '' ]];
     then
-        echo "Log: No updates available."
-	    osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
+        echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
+        osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
         return 1
     fi
     cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
 
-    echo "macOS updates:"
-    echo "$cleanUpdateList"
+    echo "Log: $(date "+%F %T") macOS updates:" | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") $cleanUpdateList" | tee -a "$logPath"
     
     # Loop through each line of $macOSAvailableUpgrades
     while IFS= read -r line;
@@ -68,7 +69,7 @@ function update_Check() {
     done <<< "$macOSAvailableUpgrades"
 
     echo ""
-    echo "Total macOS updates available: $updateCount"
+    echo "Log: $(date "+%F %T") Total macOS updates available: $updateCount" | tee -a "$logPath"
     return 0
 }
 
@@ -94,41 +95,41 @@ OOP
     )
     if [ -z "$userPrompt" ];
     then
-        echo "Log: User selected cancel"
+        echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
         exit 0
     elif [[ "$userPrompt" == "timeout" ]];
     then
-        echo "Log: Timed out. Reprompting."
+        echo "Log: $(date "+%F %T") Timed out. Reprompting." | tee -a "$logPath"
         prompt_User
     fi
 }
 
 # Prompt the user for their password, reprompting if they enter nothing
 function password_Prompt(){
-	echo "Prompting user for their password"
-	currentUserPassword=$(osascript <<OOP
-	    set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: Password Prompt" giving up after 900)
-	    if button returned of currentUserPassword is equal to "OK" then
-	        return text returned of currentUserPassword
-	    else
-	        return "timeout"
-	    end if
+    echo "Log: $(date "+%F %T") Prompting user for their password" | tee -a "$logPath"
+    currentUserPassword=$(osascript <<OOP
+        set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: Password Prompt" giving up after 900)
+        if button returned of currentUserPassword is equal to "OK" then
+            return text returned of currentUserPassword
+        else
+            return "timeout"
+        end if
 OOP
-	)
+    )
     if [[ $? != 0 ]];
     then
-        echo "Log: User selected cancel"
+        echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
         return 1
-	elif [[ -z "$currentUserPassword" ]];
-	then
-	    echo "No password entered"
-	    osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: Password Prompt\""
-	    password_Prompt
-	elif [[ "$currentUserPassword" == 'timeout' ]];
-	then
-    	echo "Log: Timed out."
-		return 1
-	fi
+    elif [[ -z "$currentUserPassword" ]];
+    then
+        echo "Log: $(date "+%F %T") No password entered" | tee -a "$logPath"
+        osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: Password Prompt\""
+        password_Prompt
+    elif [[ "$currentUserPassword" == 'timeout' ]];
+    then
+        echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
+        return 1
+    fi
     return 0
 }
 
@@ -170,33 +171,35 @@ function check_CurrentUser_Ownership() {
     if [[ "$currentUserOwner" != true ]];
     then
         osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        echo "Log: \"$currentUser\" is not a volume owner, exiting."
+        echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner, exiting." | tee -a "$logPath"
         exit 0
     fi
 }
 
 function main() {
+    echo "Log: $(date "+%F %T") Beginning Software Update script" | tee "$logPath"
+
     if ! icon_Check;
     then
-        echo "Log: exiting for no SLU icon"
+        echo "Log: $(date "+%F %T") Exiting for no SLU icon" | tee -a "$logPath"
         exit 1
     fi
     
     if ! login_Check;
     then
-        echo "Log: exiting for invalid user logged in"
+        echo "Log: $(date "+%F %T") Exiting for invalid user logged in" | tee -a "$logPath"
         exit 1
     fi
 
     if ! update_Check;
     then
-        echo "Log: No updates available"
+        echo "Log: $(date "+%F %T") No updates available" | tee -a "$logPath"
         exit 0
     fi
 
     if ! prompt_User;
     then
-        echo "Log: exiting at password prompt"
+        echo "Log: $(date "+%F %T") Exiting at password prompt" | tee -a "$logPath"
         exit 1
     fi
 
