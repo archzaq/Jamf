@@ -53,8 +53,6 @@ function update_Check() {
     macOSAvailableUpgrades=$(echo "$result" | grep "Label: macOS")
     if [[ "$macOSAvailableUpgrades" == '' ]];
     then
-        echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
-        osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
         return 1
     fi
     cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
@@ -194,6 +192,7 @@ function main() {
     if ! update_Check;
     then
         echo "Log: $(date "+%F %T") No updates available" | tee -a "$logPath"
+        osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
         exit 0
     fi
 
