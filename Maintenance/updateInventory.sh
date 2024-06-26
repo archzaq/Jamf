@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 7-12-23   ###
-### Updated: 6-25-24   ###
-### Version: 1.8       ###
+### Updated: 6-26-24   ###
+### Version: 1.9       ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
@@ -12,6 +12,7 @@ readonly jamf_connect_app="/Applications/Jamf Connect.app"
 readonly currentName=$(hostname)
 readonly logPath='/var/log/updateInventory.log'
 
+# Attempt to handle a jamf policy already being run
 function check_already_running() {
     local checkResult="$1"
     local event="$2"
@@ -39,6 +40,7 @@ function check_already_running() {
     return 1
 }
 
+# Return false if the current device name doesnt fit naming scheme
 function check_Name() {
     # If the current device name contains "Mac" or "SLU" return false
     if [[ "$currentName" == *"Mac"* ]] || [[ "$currentName" == "SLU-"* ]];
@@ -63,6 +65,7 @@ function check_Name() {
 
 
 
+# Enrollment policies
 echo "Log: $(date "+%F %T") Checking for lingering enrollment policies" | tee "$logPath"
 
 enrollment_check_result=$(/usr/local/bin/jamf policy -event enrollmentComplete)
@@ -79,6 +82,7 @@ sleep 1
 
 
 
+# Naming check
 echo "Log: $(date "+%F %T") Checking for correct naming" | tee -a "$logPath"
 
 if ! check_Name;
@@ -97,6 +101,7 @@ sleep 1
 
 
 
+# General policies
 echo "Log: $(date "+%F %T") Checking for remaining policies" | tee -a "$logPath"
 
 policy_check_result=$(/usr/local/bin/jamf policy)
@@ -113,12 +118,14 @@ sleep 1
 
 
 
+# Update inventory
 echo "Log: $(date "+%F %T") Updating inventory" | tee -a "$logPath"
 /usr/local/bin/jamf recon
 echo "Log: $(date "+%F %T") Inventory update complete" | tee -a "$logPath"
 
 
 
+# Rosetta runtime check
 if [[ $(/usr/bin/uname -p) = 'arm' ]];
 then
     echo "Log: $(date "+%F %T") Checking for Rosetta runtime" | tee -a "$logPath"
@@ -144,6 +151,7 @@ fi
 
 
 
+# Jamf Connect check
 echo "Log: $(date "+%F %T") Checking for Jamf Connect" | tee -a "$logPath"
 if [[ ! -d "$jamf_connect_app" ]] || [[ ! -f "$jamf_connect_plist" ]];
 then
