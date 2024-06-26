@@ -184,7 +184,7 @@ function main() {
     
     if ! login_Check;
     then
-        echo "Log: exiting for no user logged in"
+        echo "Log: exiting for invalid user logged in"
         exit 1
     fi
 
