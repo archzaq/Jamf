@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-6-24    ###
-### Updated: 6-20-24   ###
-### Version: 2.1       ###
+### Updated: 6-26-24   ###
+### Version: 2.2       ###
 ##########################
 
 managementAccount="$4"
@@ -131,13 +131,14 @@ OOP
     elif [[ "$lowerPass" == 'cancel' ]];
     then
         echo "Log: User used hidden exit"
-        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
-        exit 1
+        return 1
     elif [[ "$loggedInUserPassword" == 'timeout' ]];
     then
         echo "Log: Timed out"
         password_Prompt
     fi
+
+    return 0
 }
 
 # Assigns secure token to management account
@@ -330,7 +331,12 @@ function main() {
         then
             if add_Account_To_AdminGroup "$loggedInUser";
             then
-                password_Prompt
+                if ! password_Prompt;
+                then
+                    /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
+                    /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+                    exit 1
+                fi
                 assign_Token
                 /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
             else
@@ -339,7 +345,11 @@ function main() {
                 exit 1
             fi
         else
-            password_Prompt
+            if ! password_Prompt;
+            then
+                /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+                exit 1
+            fi
             assign_Token
         fi
     fi
