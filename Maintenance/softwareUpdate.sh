@@ -94,12 +94,14 @@ OOP
     if [ -z "$userPrompt" ];
     then
         echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
-        exit 0
+        return 1
     elif [[ "$userPrompt" == "timeout" ]];
     then
         echo "Log: $(date "+%F %T") Timed out. Reprompting." | tee -a "$logPath"
         prompt_User
     fi
+
+    return 0
 }
 
 # Prompt the user for their password, reprompting if they enter nothing
@@ -126,8 +128,9 @@ OOP
     elif [[ "$currentUserPassword" == 'timeout' ]];
     then
         echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
-        return 1
+        password_Prompt
     fi
+
     return 0
 }
 
@@ -198,7 +201,7 @@ function main() {
 
     if ! prompt_User;
     then
-        echo "Log: $(date "+%F %T") Exiting at password prompt" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting at user prompt" | tee -a "$logPath"
         exit 1
     fi
 
@@ -206,7 +209,12 @@ function main() {
     then
         gather_SecureToken_UserList
         check_CurrentUser_Ownership
-        password_Prompt
+        if ! password_Prompt;
+        then
+            echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
+            exit 1
+        fi
+
         echo "$currentUserPassword" | /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass
     else
         /usr/sbin/softwareupdate --verbose -iRr --agree-to-license
