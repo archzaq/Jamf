@@ -362,7 +362,7 @@ function main() {
         /usr/local/bin/jamf policy -event CyberArk
         exit 0
     else
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions." as critical buttons {"OK"} default button "OK"'
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions.\n\nDouble check your password." as critical buttons {"OK"} default button "OK"'
         main
     fi
 }
