@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-6-24    ###
-### Updated: 6-26-24   ###
-### Version: 2.2       ###
+### Updated: 6-27-24   ###
+### Version: 2.3       ###
 ##########################
 
 managementAccount="$4"
@@ -324,19 +324,19 @@ function main() {
         exit 1
     fi
 
-    # If management account doesnt have a secure token, grant one after making the loggedInUser a temporary admin
+    # If management account doesnt have a secure token, ask for their password, then grant admin only to assign a token
     if ! secure_Token_Check "$managementAccount";
     then
         if ! admin_Check "$loggedInUser";
         then
+            if ! password_Prompt;
+            then
+                /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+                exit 1
+            fi
+
             if add_Account_To_AdminGroup "$loggedInUser";
             then
-                if ! password_Prompt;
-                then
-                    /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
-                    /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
-                    exit 1
-                fi
                 assign_Token
                 /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
             else
