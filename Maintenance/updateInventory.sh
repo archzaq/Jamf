@@ -9,7 +9,6 @@
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
 readonly jamf_connect_app="/Applications/Jamf Connect.app"
-readonly currentName=$(hostname)
 readonly logPath='/var/log/updateInventory.log'
 
 # Attempt to handle a jamf policy already being run
@@ -42,6 +41,8 @@ function check_already_running() {
 
 # Return false if the current device name doesnt fit naming scheme
 function check_Name() {
+    currentName=$(hostname)
+
     # If the current device name contains "Mac" or "SLU" return false
     if [[ "$currentName" == *"Mac"* ]] || [[ "$currentName" == "SLU-"* ]];
     then
@@ -75,25 +76,6 @@ then
 else
     echo "Log: $(date "+%F %T") Enrollment policy check complete" | tee -a "$logPath"
 fi
-
-
-
-sleep 1
-
-
-
-# Naming check
-echo "Log: $(date "+%F %T") Checking for correct naming" | tee -a "$logPath"
-
-if ! check_Name;
-then
-    echo "Log: $(date "+%F %T") Device name, $currentName, does not fit naming scheme" | tee -a "$logPath"
-    /usr/local/bin/jamf policy -event rename
-else
-    echo "Log: $(date "+%F %T") Device name, $currentName, fits naming scheme" | tee -a "$logPath"
-fi
-
-echo "Log: $(date "+%F %T") Name check complete" | tee -a "$logPath"
 
 
 
@@ -147,7 +129,31 @@ then
     else
         echo "Log: $(date "+%F %T") Rosetta runtime present" | tee -a "$logPath"
     fi
+    echo "Log: $(date "+%F %T") Rosetta runtime check complete" | tee -a "$logPath"
 fi
+
+
+
+sleep 1
+
+
+
+# Naming check
+echo "Log: $(date "+%F %T") Checking for correct naming" | tee -a "$logPath"
+
+if ! check_Name;
+then
+    echo "Log: $(date "+%F %T") Device name, $currentName, does not fit naming scheme" | tee -a "$logPath"
+    /usr/local/bin/jamf policy -event rename
+else
+    echo "Log: $(date "+%F %T") Device name, $currentName, fits naming scheme" | tee -a "$logPath"
+fi
+
+echo "Log: $(date "+%F %T") Name check complete" | tee -a "$logPath"
+
+
+
+sleep 1
 
 
 
