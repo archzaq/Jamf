@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 7-12-23   ###
-### Updated: 6-26-24   ###
-### Version: 1.9       ###
+### Updated: 6-27-24   ###
+### Version: 1.10      ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
