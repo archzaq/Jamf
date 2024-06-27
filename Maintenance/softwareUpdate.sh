@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 6-26-24   ###
-### Version: 1.3       ###
+### Updated: 6-27-24   ###
+### Version: 1.4       ###
 ##########################
 
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -205,7 +205,7 @@ function main() {
         exit 1
     fi
 
-    if [[ $(uname -p) == "arm" ]];
+    if [[ $(uname -p) == 'arm' ]];
     then
         gather_SecureToken_UserList
         check_CurrentUser_Ownership
@@ -215,7 +215,7 @@ function main() {
             exit 1
         fi
 
-        echo "$currentUserPassword" | /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass
+        /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass "$currentUserPassword"
     else
         /usr/sbin/softwareupdate --verbose -iRr --agree-to-license
     fi
