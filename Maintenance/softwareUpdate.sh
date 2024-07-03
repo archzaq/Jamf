@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 6-27-24   ###
-### Version: 1.4       ###
+### Updated: 7-2-24    ###
+### Version: 1.6       ###
 ##########################
 
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -131,6 +131,7 @@ OOP
         password_Prompt
     fi
 
+    echo "Log: $(date "+%F %T") Password prompt finished" | tee -a "$logPath"
     return 0
 }
 
@@ -177,6 +178,23 @@ function check_CurrentUser_Ownership() {
     fi
 }
 
+# Dialog box to inform user the update is installing
+function update_Prompt() {
+    updatePrompt=$(osascript <<OOP
+    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the update is finished downloading, your device will immediately restart.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    if button returned of updatePrompt is equal to "Continue" then
+        return "Continue"
+    else
+        return "timeout"
+    end if
+OOP
+    )
+    if [[ "$updatePrompt" == 'Continue' ]];
+    then
+        echo "Log: $(date "+%F %T") User selected \"Continue\" through the final update dialog box" | tee -a "$logPath"
+    fi
+}
+
 function main() {
     echo "Log: $(date "+%F %T") Beginning Software Update script" | tee "$logPath"
 
@@ -215,10 +233,16 @@ function main() {
             exit 1
         fi
 
+        echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
+        update_Prompt &
         /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass "$currentUserPassword"
     else
+        echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
+        update_Prompt &
         /usr/sbin/softwareupdate --verbose -iRr --agree-to-license
     fi
+
+    exit 0
 }
 
 main
