@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 7-2-24    ###
-### Version: 1.6       ###
+### Updated: 7-18-24   ###
+### Version: 1.9       ###
 ##########################
 
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -181,17 +181,18 @@ function check_CurrentUser_Ownership() {
 # Dialog box to inform user the update is installing
 function update_Prompt() {
     updatePrompt=$(osascript <<OOP
-    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the update is finished downloading, your device will immediately restart.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
-    if button returned of updatePrompt is equal to "Continue" then
-        return "Continue"
+    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the update is finished downloading, your device will restart.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    if button returned of updatePrompt is equal to "OK" then
+        return "OK"
     else
         return "timeout"
     end if
 OOP
     )
-    if [[ "$updatePrompt" == 'Continue' ]];
+    if [[ "$updatePrompt" == 'OK' ]];
     then
-        echo "Log: $(date "+%F %T") User selected \"Continue\" through the final update dialog box" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") User selected \"OK\" through the final update dialog box" | tee -a "$logPath"
+        osascript -e 'tell application "Terminal" to do script "caffeinate -d"'
     fi
 }
 
@@ -233,13 +234,13 @@ function main() {
             exit 1
         fi
 
+        update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
-        update_Prompt &
-        /usr/sbin/softwareupdate --verbose -iRr --agree-to-license --user "$currentUser" --stdinpass "$currentUserPassword"
+        /usr/sbin/softwareupdate --verbose --install --all --restart --agree-to-license --user "$currentUser" --stdinpass "$currentUserPassword"
     else
+        update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
-        update_Prompt &
-        /usr/sbin/softwareupdate --verbose -iRr --agree-to-license
+        /usr/sbin/softwareupdate --verbose --install --all --restart --agree-to-license
     fi
 
     exit 0
