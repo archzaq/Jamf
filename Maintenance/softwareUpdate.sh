@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 7-18-24   ###
-### Version: 1.9       ###
+### Updated: 7-29-24   ###
+### Version: 1.10      ###
 ##########################
 
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -50,7 +50,7 @@ function update_Check() {
     echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
     echo "Log: $(date "+%F %T") $result" | tee -a "$logPath"
 
-    macOSAvailableUpgrades=$(echo "$result" | grep "Label: macOS")
+    macOSAvailableUpgrades=$(echo "$result" | grep "Label: ")
     if [[ "$macOSAvailableUpgrades" == '' ]];
     then
         return 1
@@ -236,11 +236,11 @@ function main() {
 
         update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
-        /usr/sbin/softwareupdate --verbose --install --all --restart --agree-to-license --user "$currentUser" --stdinpass "$currentUserPassword"
+        /usr/sbin/softwareupdate -i -a --restart --agree-to-license --verbose --user "$currentUser" --stdinpass "$currentUserPassword"
     else
         update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
-        /usr/sbin/softwareupdate --verbose --install --all --restart --agree-to-license
+        /usr/sbin/softwareupdate -i -a --restart --agree-to-license --verbose
     fi
 
     exit 0
