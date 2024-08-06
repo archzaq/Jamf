@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ##########################
-### Author: Zac Reeves ###
+### Author:ChatGippity ###
 ### Created: 8-1-24    ###
 ### Updated: 8-6-24    ###
 ### Version: 1.0       ###
