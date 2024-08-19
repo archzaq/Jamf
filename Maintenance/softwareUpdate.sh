@@ -3,10 +3,12 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 7-29-24   ###
-### Version: 1.10      ###
+### Updated: 8-19-24   ###
+### Version: 1.11      ###
 ##########################
 
+managementAccount="$4"
+managementAccountPass="$5"
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
 readonly logPath='/var/log/softwareUpdate.log'
 
@@ -42,7 +44,55 @@ function login_Check() {
     fi
 }
 
-# Check for any OS updates and store them in $macOSAvailableUpgrades
+# Check if account exists
+function account_Check() {
+    local account="$1"
+
+    if id "$account" &>/dev/null;
+    then
+        echo "Log: \"$account\" exists"
+        return 0
+    else
+        echo "Log: \"$account\" does not exist"
+        return 1
+    fi
+}
+
+# Check if account is in the admin group
+function admin_Check(){
+    local account="$1"
+    local groupList=$(/usr/bin/groups "$account")
+
+    if [[ $groupList == *" admin "* ]];
+    then
+        echo "Log: \"$account\" is an admin"
+        return 0
+    else
+        echo "Log: \"$account\" is not an admin"
+        return 1
+    fi
+}
+
+# Assigns secure token to current user using management account
+function assign_Token(){
+    # Test the sysadminctl command for a success before actually attempting to grant a secure token
+    output=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$loggedInUser" -password "$loggedInUserPassword" -test 2>&1)
+
+    # If the test was successful, assign management account a secure token
+    if [[ $output == *"Done"* ]];
+    then
+        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$loggedInUser" -password "$loggedInUserPassword"
+        echo "Log: Success!!"
+        return 0
+
+    # If the test was not successful, exit
+    else
+        echo "Log: Error with sysadminctl command"
+        return 1
+    fi
+}
+
+# Check for any OS updates and store them in $availableUpgrades
 # Also counts how many updates available
 function update_Check() {
     updateCount=0
@@ -50,21 +100,22 @@ function update_Check() {
     echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
     echo "Log: $(date "+%F %T") $result" | tee -a "$logPath"
 
-    macOSAvailableUpgrades=$(echo "$result" | grep "Label: ")
-    if [[ "$macOSAvailableUpgrades" == '' ]];
+    # WIP
+    availableUpgrades=$(echo "$result" | grep "Label: ")
+    if [[ "$availableUpgrades" == '' ]];
     then
         return 1
     fi
-    cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
+    cleanUpdateList=$(echo "$availableUpgrades" | awk '{print $3,$4,$5}')
 
-    echo "Log: $(date "+%F %T") macOS updates:" | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
     echo "Log: $(date "+%F %T") $cleanUpdateList" | tee -a "$logPath"
     
-    # Loop through each line of $macOSAvailableUpgrades
+    # Loop through each line of $availableUpgrades
     while IFS= read -r line;
     do
         updateCount=$((updateCount + 1))
-    done <<< "$macOSAvailableUpgrades"
+    done <<< "$availableUpgrades"
 
     echo ""
     echo "Log: $(date "+%F %T") Total macOS updates available: $updateCount" | tee -a "$logPath"
