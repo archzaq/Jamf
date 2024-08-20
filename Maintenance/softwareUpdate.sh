@@ -3,12 +3,13 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 8-19-24   ###
+### Updated: 8-20-24   ###
 ### Version: 1.11      ###
 ##########################
 
 managementAccount="$4"
 managementAccountPass="$5"
+passwordPromptBool=false
 readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
 readonly logPath='/var/log/softwareUpdate.log'
 
@@ -50,10 +51,10 @@ function account_Check() {
 
     if id "$account" &>/dev/null;
     then
-        echo "Log: \"$account\" exists"
+        echo "Log: $(date "+%F %T") \"$account\" exists." | tee -a "$logPath"
         return 0
     else
-        echo "Log: \"$account\" does not exist"
+        echo "Log: $(date "+%F %T") \"$account\" does not exist." | tee -a "$logPath"
         return 1
     fi
 }
@@ -65,10 +66,10 @@ function admin_Check(){
 
     if [[ $groupList == *" admin "* ]];
     then
-        echo "Log: \"$account\" is an admin"
+        echo "Log: $(date "+%F %T") \"$account\" is an admin." | tee -a "$logPath"
         return 0
     else
-        echo "Log: \"$account\" is not an admin"
+        echo "Log: $(date "+%F %T") \"$account\" is not an admin." | tee -a "$logPath"
         return 1
     fi
 }
@@ -76,18 +77,18 @@ function admin_Check(){
 # Assigns secure token to current user using management account
 function assign_Token(){
     # Test the sysadminctl command for a success before actually attempting to grant a secure token
-    output=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$loggedInUser" -password "$loggedInUserPassword" -test 2>&1)
+    output=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword" -test 2>&1)
 
     # If the test was successful, assign management account a secure token
     if [[ $output == *"Done"* ]];
     then
-        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$loggedInUser" -password "$loggedInUserPassword"
-        echo "Log: Success!!"
+        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword"
+        echo "Log: $(date "+%F %T") Success assigning secure token!" | tee -a "$logPath"
         return 0
 
     # If the test was not successful, exit
     else
-        echo "Log: Error with sysadminctl command"
+        echo "Log: $(date "+%F %T") Error with sysadminctl command." | tee -a "$logPath"
         return 1
     fi
 }
@@ -183,6 +184,7 @@ OOP
     fi
 
     echo "Log: $(date "+%F %T") Password prompt finished" | tee -a "$logPath"
+    passwordPromptBool=true
     return 0
 }
 
@@ -219,13 +221,14 @@ function check_CurrentUser_Ownership() {
         if [[ "$id" == "$currentUserGUID" ]];
         then
             currentUserOwner=true
+            return 0
         fi
     done
     if [[ "$currentUserOwner" != true ]];
     then
-        osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner, exiting." | tee -a "$logPath"
-        exit 0
+        #osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
+        echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner." | tee -a "$logPath"
+        return 1
     fi
 }
 
@@ -278,11 +281,51 @@ function main() {
     if [[ $(uname -p) == 'arm' ]];
     then
         gather_SecureToken_UserList
-        check_CurrentUser_Ownership
-        if ! password_Prompt;
+        if ! check_CurrentUser_Ownership;
         then
-            echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
-            exit 1
+            echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
+            if ! account_Check "$managementAccount";
+            then
+                echo "Log: $(date "+%F %T") Management account does not exist, exiting" | tee -a "$logPath"
+                exit 1
+            fi
+
+            if ! admin_Check "$managementAccount";
+            then
+                echo "Log: $(date "+%F %T") Management account not an admin, exiting" | tee -a "$logPath"
+                exit 1
+            fi
+            
+            if sysadminctl -secureTokenStatus "$managementAccount" 2>&1 | grep -q 'ENABLED';
+            then
+                if ! password_Prompt;
+                then
+                    echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
+                    exit 1
+                fi
+
+                if ! assign_Token;
+                then
+                    echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting" | tee -a "$logPath"
+                    exit 1
+                fi
+                
+                echo "Log: $(date "+%F %T") Secure token granted!" | tee -a "$logPath"
+            else
+                echo "Log: $(date "+%F %T") Management account does not have a secure token, exiting" | tee -a "$logPath"
+                exit 1
+            fi
+        fi
+
+        if [ "$passwordPromptBool" = true ];
+        then
+            echo "Log: $(date "+%F %T") Already asked for password, continuing" | tee -a "$logPath"
+        else
+            if ! password_Prompt;
+            then
+                echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
+                exit 1
+            fi
         fi
 
         update_Prompt
