@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
 ### Updated: 8-22-24   ###
-### Version: 1.12      ###
+### Version: 1.13      ###
 ##########################
 
 managementAccount="$4"
@@ -281,12 +281,14 @@ function main() {
             if ! account_Check "$managementAccount";
             then
                 echo "Log: $(date "+%F %T") Management account does not exist, exiting" | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not exist. Unable to grant you the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
 
             if ! admin_Check "$managementAccount";
             then
                 echo "Log: $(date "+%F %T") Management account not an admin, exiting" | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to grant you the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
             
@@ -301,10 +303,12 @@ function main() {
                 if ! assign_Token;
                 then
                     echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting" | tee -a "$logPath"
+                    /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
                     exit 1
                 fi
             else
                 echo "Log: $(date "+%F %T") Management account does not have a secure token, exiting" | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not have a secure token. Unable to assign secure token." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
         fi
