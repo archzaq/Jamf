@@ -189,6 +189,7 @@ function check_CurrentUser_Ownership() {
     do
         if [[ "$id" == "$currentUserGUID" ]];
         then
+            echo "Log: $(date "+%F %T") \"$currentUser\" is a volume owner." | tee -a "$logPath"
             currentUserOwner=true
             return 0
         fi
@@ -203,7 +204,7 @@ function check_CurrentUser_Ownership() {
 # Dialog box to inform user the update is installing
 function update_Prompt() {
     local updatePrompt=$(osascript <<OOP
-    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the update is finished downloading, your device will restart.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
+    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the download is finished, your device will automatically restart to apply the changes.\n\nIf you don't see any updates after an hour, please try restarting your device and running this policy again.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of updatePrompt is equal to "OK" then
         return "OK"
     else
@@ -303,6 +304,8 @@ function main() {
         update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
         /usr/sbin/softwareupdate -i -a --restart --agree-to-license --verbose --user "$currentUser" --stdinpass "$currentUserPassword"
+
+    # Intel device upgrade path
     else
         update_Prompt
         echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
