@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-23-24   ###
-### Updated: 8-22-24   ###
-### Version: 1.13      ###
+### Updated: 8-23-24   ###
+### Version: 1.14      ###
 ##########################
 
 managementAccount="$4"
@@ -179,28 +179,6 @@ OOP
     return 0
 }
 
-# Get a list of secure token users to display in check_CurrentUser_Ownership with the $phrase variable
-function gather_SecureToken_UserList() {
-    local secureTokenUserArray=()
-    local userList=""
-    for user in $(ls /Users/);
-    do
-        username=$(basename "$user")
-        if sysadminctl -secureTokenStatus "$username" 2>&1 | grep -q 'ENABLED';
-        then
-            secureTokenUserArray+=("$username")
-        fi
-    done
-    if [[ -z "$secureTokenUserArray" ]];
-    then
-        userList="No secure token accounts available.\n\nPlease contact the IT Service Desk at (314)-977-4000."
-        phrase=$(echo "$userList")
-    else
-        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        phrase=$(echo -e "Log in as one of the following accounts:\n$userList")
-    fi
-}
-
 # Check current user for volume ownership
 function check_CurrentUser_Ownership() {
     local currentUserOwner=false
@@ -217,7 +195,6 @@ function check_CurrentUser_Ownership() {
     done
     if [[ "$currentUserOwner" != true ]];
     then
-        #osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
         echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner." | tee -a "$logPath"
         return 1
     fi
@@ -274,21 +251,20 @@ function main() {
     # If that exists, it will use the management account to grant the user a secure token.
     if [[ $(uname -p) == 'arm' ]];
     then
-        gather_SecureToken_UserList
         if ! check_CurrentUser_Ownership;
         then
             echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
             if ! account_Check "$managementAccount";
             then
                 echo "Log: $(date "+%F %T") Management account does not exist, exiting" | tee -a "$logPath"
-                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not exist. Unable to grant you the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not exist. Unable to grant the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
 
             if ! admin_Check "$managementAccount";
             then
                 echo "Log: $(date "+%F %T") Management account not an admin, exiting" | tee -a "$logPath"
-                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to grant you the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to grant the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
             
