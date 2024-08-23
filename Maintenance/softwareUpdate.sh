@@ -10,7 +10,7 @@
 managementAccount="$4"
 managementAccountPass="$5"
 passwordPromptBool=false
-readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
+readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
 readonly logPath='/var/log/softwareUpdate.log'
 readonly iconPath='/usr/local/jamfconnect/SLU.icns'
 readonly dialogTitle='SLU ITS: OS Update'
@@ -33,7 +33,7 @@ function icon_Check() {
 
 # Check if someone is logged into the device
 function login_Check() {
-    local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+    local account="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
     if [[ "$account" == 'root' ]];
     then
         echo "Log: $(date "+%F %T") \"$account\" currently logged in." | tee -a "$logPath"
@@ -51,7 +51,7 @@ function login_Check() {
 # Check if account exists
 function account_Check() {
     local account="$1"
-    if id "$account" &>/dev/null;
+    if /usr/bin/id "$account" &>/dev/null;
     then
         echo "Log: $(date "+%F %T") \"$account\" exists." | tee -a "$logPath"
         return 0
@@ -128,7 +128,7 @@ function prompt_User() {
     then
         promptMessage="You have one OS update available.\n\nAvailable Update:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
     fi
-    local userPrompt=$(osascript <<OOP
+    local userPrompt=$(/usr/bin/osascript <<OOP
     set dialogResult to (display dialog "$promptMessage" buttons {"Cancel", "Begin Download and Install"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of dialogResult is equal to "Begin Download and Install" then
         return "Begin Download and Install"
@@ -154,7 +154,7 @@ OOP
 function password_Prompt(){
     local readonly passwordTitle='SLU ITS: Password Prompt'
     echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
-    currentUserPassword=$(osascript <<OOP
+    currentUserPassword=$(/usr/bin/osascript <<OOP
         set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$iconPath" with title "$passwordTitle" giving up after 900)
         if button returned of currentUserPassword is equal to "OK" then
             return text returned of currentUserPassword
@@ -170,7 +170,7 @@ OOP
     elif [[ -z "$currentUserPassword" ]];
     then
         echo "Log: $(date "+%F %T") No password entered." | tee -a "$logPath"
-        osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\""
+        /usr/bin/osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\""
         password_Prompt
     elif [[ "$currentUserPassword" == 'timeout' ]];
     then
@@ -186,11 +186,11 @@ OOP
 function check_Ownership() {
     local account="$1"
     local volumeOwner=false
-    local accountGUID=$(dscl . -read /Users/$account GeneratedUID | awk '{print $2}')
-    local systemVolume=$(diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
+    local accountGUID=$(/usr/bin/dscl . -read /Users/$account GeneratedUID | awk '{print $2}')
+    local systemVolume=$(/usr/sbin/diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
     local systemVolumePath="/Volumes/$systemVolume"
     echo "Log: $(date "+%F %T") Checking \"$account\" for volume ownership." | tee -a "$logPath"
-    for id in $(diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
+    for id in $(/usr/sbin/diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
     do
         if [[ "$id" == "$accountGUID" ]];
         then
@@ -208,8 +208,8 @@ function check_Ownership() {
 
 # Dialog box to inform user the update is installing
 function update_Prompt() {
-    local updatePrompt=$(osascript <<OOP
-    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the download is finished, your device will automatically restart to apply the changes.\n\nIf you don't see any updates after an hour, please try restarting your device and running this policy again.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
+    local updatePrompt=$(/usr/bin/osascript <<OOP
+    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the download is finished, your device will automatically restart to apply the changes. If you don't see any updates after an hour, please try restarting your device and running this policy again.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of updatePrompt is equal to "OK" then
         return "OK"
     else
@@ -220,7 +220,7 @@ OOP
     if [[ "$updatePrompt" == 'OK' ]];
     then
         echo "Log: $(date "+%F %T") User selected \"OK\" through the final dialog box." | tee -a "$logPath"
-        osascript -e 'tell application "Terminal" to do script "caffeinate -d"'
+        /usr/bin/osascript -e 'tell application "Terminal" to do script "caffeinate -d"'
     fi
 }
 
@@ -242,7 +242,7 @@ function main() {
     if ! update_Check;
     then
         echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
-        osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
+        /usr/bin/osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
         exit 0
     fi
 
@@ -255,7 +255,7 @@ function main() {
     # To upgrade on Apple Silicon, the user needs to have a secure token and they will be prompted for their password.
     # If they do not have a secure token, it will check for our management account to exist with the proper permissions.
     # If that exists, it will use the management account to grant the user a secure token.
-    if [[ $(uname -p) == 'arm' ]];
+    if [[ $(/usr/bin/uname -p) == 'arm' ]];
     then
         if ! check_Ownership "$currentUser";
         then
