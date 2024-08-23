@@ -179,24 +179,25 @@ OOP
     return 0
 }
 
-# Check current user for volume ownership
-function check_CurrentUser_Ownership() {
-    local currentUserOwner=false
-    local currentUserGUID=$(dscl . -read /Users/$currentUser GeneratedUID | awk '{print $2}')
+# Check user account for volume ownership
+function check_Ownership() {
+    local account="$1"
+    local volumeOwner=false
+    local accountGUID=$(dscl . -read /Users/$account GeneratedUID | awk '{print $2}')
     local systemVolume=$(diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
     local systemVolumePath="/Volumes/$systemVolume"
     for id in $(diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
     do
-        if [[ "$id" == "$currentUserGUID" ]];
+        if [[ "$id" == "$accountGUID" ]];
         then
-            echo "Log: $(date "+%F %T") \"$currentUser\" is a volume owner." | tee -a "$logPath"
-            currentUserOwner=true
+            echo "Log: $(date "+%F %T") \"$account\" is a volume owner." | tee -a "$logPath"
+            volumeOwner=true
             return 0
         fi
     done
-    if [[ "$currentUserOwner" != true ]];
+    if [[ "$volumeOwner" != true ]];
     then
-        echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") \"$account\" is not a volume owner." | tee -a "$logPath"
         return 1
     fi
 }
@@ -252,7 +253,7 @@ function main() {
     # If that exists, it will use the management account to grant the user a secure token.
     if [[ $(uname -p) == 'arm' ]];
     then
-        if ! check_CurrentUser_Ownership;
+        if ! check_Ownership "$currentUser";
         then
             echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
             if ! account_Check "$managementAccount";
@@ -269,23 +270,23 @@ function main() {
                 exit 1
             fi
             
-            if sysadminctl -secureTokenStatus "$managementAccount" 2>&1 | grep -q 'ENABLED';
+            if ! check_Ownership "$managementAccount";
             then
-                if ! password_Prompt;
-                then
-                    echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
-                    exit 1
-                fi
-
-                if ! assign_Token;
-                then
-                    echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting" | tee -a "$logPath"
-                    /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
-                    exit 1
-                fi
-            else
                 echo "Log: $(date "+%F %T") Management account does not have a secure token, exiting" | tee -a "$logPath"
                 /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not have a secure token. Unable to assign secure token." as critical buttons {"OK"} default button "OK" giving up after 900'
+                exit 1
+            fi
+
+            if ! password_Prompt;
+            then
+                echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
+                exit 1
+            fi
+
+            if ! assign_Token;
+            then
+                echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting" | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
                 exit 1
             fi
         fi
