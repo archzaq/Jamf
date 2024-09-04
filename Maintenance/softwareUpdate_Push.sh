@@ -3,122 +3,133 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-21-24   ###
-### Updated: 8-1-24    ###
-### Version: 1.1       ###
+### Updated: 9-3-24    ###
+### Version: 2.1       ###
 ##########################
 
-readonly currentUser="$(defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
-readonly logPath='/var/log/softwareUpdate.log'
+managementAccount="$4"
+managementAccountPass="$5"
+passwordPromptBool=false
+readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
+readonly logPath='/var/log/softwareUpdatePush.log'
+readonly iconPath='/usr/local/jamfconnect/SLU.icns'
+readonly dialogTitle='SLU ITS: OS Update'
 
-# Check for SLU icon file
+# Check for SLU icon file, applescript dialog boxes will error without it
 function icon_Check() {
-    if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
+    if [[ ! -f "$iconPath" ]];
     then
+        echo "Log: $(date "+%F %T") No SLU icon found, attempting install." | tee -a "$logPath"
         /usr/local/bin/jamf policy -event SLUFonts
-        if [[ ! -f "/usr/local/jamfconnect/SLU.icns" ]];
+        if [[ ! -f "$iconPath" ]];
         then
-            echo "Log: $(date "+%F %T") No SLU icon installed, exiting." | tee -a "$logPath"
+            echo "Log: $(date "+%F %T") No SLU icon found, exiting." | tee -a "$logPath"
             return 1
         fi
     fi
+    echo "Log: $(date "+%F %T") SLU icon found, continuing." | tee -a "$logPath"
     return 0
 }
 
 # Check if someone is logged into the device
 function login_Check() {
-    local account="$(scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-
+    local account="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
     if [[ "$account" == 'root' ]];
     then
-        echo "Log: $(date "+%F %T") \"$account\" currently logged in" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") \"$account\" currently logged in." | tee -a "$logPath"
         return 1
     elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
     then
-        echo "Log: $(date "+%F %T") No one logged in" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") No one logged in." | tee -a "$logPath"
         return 1
     else
-        echo "Log: $(date "+%F %T") \"$account\" currently logged in" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") \"$account\" currently logged in." | tee -a "$logPath"
         return 0
     fi
 }
 
-# Check for any OS updates and store them in $macOSAvailableUpgrades
+# Check if account exists
+function account_Check() {
+    local account="$1"
+    if /usr/bin/id "$account" &>/dev/null;
+    then
+        echo "Log: $(date "+%F %T") \"$account\" exists." | tee -a "$logPath"
+        return 0
+    else
+        echo "Log: $(date "+%F %T") \"$account\" does not exist." | tee -a "$logPath"
+        return 1
+    fi
+}
+
+# Check if account is in the admin group
+function admin_Check(){
+    local account="$1"
+    local groupList=$(/usr/bin/groups "$account")
+    if [[ $groupList == *" admin "* ]];
+    then
+        echo "Log: $(date "+%F %T") \"$account\" is an admin." | tee -a "$logPath"
+        return 0
+    else
+        echo "Log: $(date "+%F %T") \"$account\" is not an admin." | tee -a "$logPath"
+        return 1
+    fi
+}
+
+# Assigns secure token to current user using management account
+function assign_Token(){
+    # Test the sysadminctl command for a success before actually attempting to grant a secure token
+    # Pretty sure this doesnt actually test and just runs the command straight up
+    local secureTokenTest=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword" -test 2>&1)
+    if [[ $secureTokenTest == *"Done"* ]];
+    then
+        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword"
+        echo "Log: $(date "+%F %T") Success assigning secure token!" | tee -a "$logPath"
+        return 0
+    else
+        echo "Log: $(date "+%F %T") Error with sysadminctl command." | tee -a "$logPath"
+        return 1
+    fi
+}
+
+# Check for any OS updates and store them in $availableUpgrades
 # Also counts how many updates available
 function update_Check() {
     updateCount=0
-    result=$(/usr/sbin/softwareupdate -l)
+    local result=$(/usr/sbin/softwareupdate -l)
     echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
     echo "Log: $(date "+%F %T") $result" | tee -a "$logPath"
 
-    macOSAvailableUpgrades=$(echo "$result" | grep "Label: ")
-    if [[ "$macOSAvailableUpgrades" == '' ]];
+    # WIP
+    local availableUpgrades=$(echo "$result" | grep "Label: ")
+    if [[ "$availableUpgrades" == '' ]];
     then
         return 1
     fi
-    cleanUpdateList=$(echo "$macOSAvailableUpgrades" | awk '{print $3,$4,$5}')
-
-    echo "Log: $(date "+%F %T") macOS updates:" | tee -a "$logPath"
+    cleanUpdateList=$(echo "$availableUpgrades" | awk '{print $3,$4,$5}')
+    echo "Log: $(date "+%F %T") Available updates:" | tee -a "$logPath"
     echo "Log: $(date "+%F %T") $cleanUpdateList" | tee -a "$logPath"
     
-    # Loop through each line of $macOSAvailableUpgrades
+    # Loop through each line of $availableUpgrades
     while IFS= read -r line;
     do
         updateCount=$((updateCount + 1))
-    done <<< "$macOSAvailableUpgrades"
-
-    echo ""
+    done <<< "$availableUpgrades"
     echo "Log: $(date "+%F %T") Total macOS updates available: $updateCount" | tee -a "$logPath"
     return 0
 }
 
-# Dialog box to inform user of the overall process taking place
-function user_Prompt() {
-    if [[ $promptCounter -ge 5 ]];
-    then
-        echo "Log: Prompted five times with no response, exiting" | tee -a "$logPath"
-        return 1
-    fi
-
-    if [[ $(uname -p) == 'arm' ]];
-    then
-        prompt="\n\nYou will be prompted for your password before the installation may begin."
-    else
-        prompt=''
-    fi
-
-    userPrompt=$(osascript <<OOP
-    set userPrompt to (display dialog "You are about to receive an OS upgrade.$prompt\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
-    if button returned of userPrompt is equal to "Continue" then
-        return "Continue"
-    else
-        return "timeout"
-    end if
-OOP
-    )
-    if [[ "$userPrompt" == 'Continue' ]];
-    then
-        echo "Log: User selected \"Continue\" through the first dialog box" | tee -a "$logPath"
-        return 0
-    else
-        echo "Log: Reprompting user with the first dialog box" | tee -a "$logPath"
-        ((promptCounter++))
-        user_Prompt
-    fi
-}
-
-# Inform the user of how many updates they currently have
+# Inform the user of how many updates they currently have with $cleanUpdateList
 function prompt_User() {
-    promptMessage=""
+    local promptMessage=""
     if ((updateCount > 1));
     then
-        promptMessage="You have more than one OS update available, you will need to run this policy for each available update.\n\nAvailable Updates:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
+        promptMessage="You have more than one update available, you will need to run this policy for each available update.\n\nAvailable Updates:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
     elif ((updateCount == 1));
     then
-        promptMessage="You have one OS update available.\n\nAvailable Update:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
+        promptMessage="You have one update available.\n\nAvailable Update:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
     fi
-
-    userPrompt=$(osascript <<OOP
-    set dialogResult to (display dialog "$promptMessage" buttons {"Begin Download and Install"} default button "Begin Download and Install" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    local userPrompt=$(/usr/bin/osascript <<OOP
+    set dialogResult to (display dialog "$promptMessage" buttons {"Begin Download and Install"} default button "Begin Download and Install" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of dialogResult is equal to "Begin Download and Install" then
         return "Begin Download and Install"
     else
@@ -128,22 +139,23 @@ OOP
     )
     if [ -z "$userPrompt" ];
     then
-        echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") User selected cancel, not sure how" | tee -a "$logPath"
         return 1
     elif [[ "$userPrompt" == "timeout" ]];
     then
         echo "Log: $(date "+%F %T") Timed out. Reprompting." | tee -a "$logPath"
         prompt_User
     fi
-
+    echo "Log: $(date "+%F %T") Dialog for available updates completed, continuing." | tee -a "$logPath"
     return 0
 }
 
 # Prompt the user for their password, reprompting if they enter nothing
 function password_Prompt(){
-    echo "Log: $(date "+%F %T") Prompting user for their password" | tee -a "$logPath"
-    currentUserPassword=$(osascript <<OOP
-        set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: Password Prompt" giving up after 900)
+    local readonly passwordTitle='SLU ITS: Password Prompt'
+    echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
+    currentUserPassword=$(/usr/bin/osascript <<OOP
+        set currentUserPassword to (display dialog "Please enter your computer password to continue with OS update:" buttons {"OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$iconPath" with title "$passwordTitle" giving up after 900)
         if button returned of currentUserPassword is equal to "OK" then
             return text returned of currentUserPassword
         else
@@ -153,74 +165,51 @@ OOP
     )
     if [[ $? != 0 ]];
     then
-        echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") User selected cancel, not sure how" | tee -a "$logPath"
         return 1
     elif [[ -z "$currentUserPassword" ]];
     then
-        echo "Log: $(date "+%F %T") No password entered" | tee -a "$logPath"
-        osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: Password Prompt\""
+        echo "Log: $(date "+%F %T") No password entered." | tee -a "$logPath"
+        /usr/bin/osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\""
         password_Prompt
     elif [[ "$currentUserPassword" == 'timeout' ]];
     then
         echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
         password_Prompt
-    elif [[ "$currentUserPassword" == 'cancel' ]];
-    then
-        echo "Log: $(date "+%F %T") Canceled in password prompt." | tee -a "$logPath"
-        return 1
     fi
-
-    echo "Log: $(date "+%F %T") Password prompt finished" | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
+    passwordPromptBool=true
     return 0
 }
 
-# Get a list of secure token users to display in check_CurrentUser_Ownership with the $phrase variable
-function gather_SecureToken_UserList() {
-    secureTokenUserArray=()
-    userList=""
-    for user in $(ls /Users/);
+# Check user account for volume ownership
+function check_Ownership() {
+    local account="$1"
+    local volumeOwner=false
+    local accountGUID=$(/usr/bin/dscl . -read /Users/$account GeneratedUID | awk '{print $2}')
+    local systemVolume=$(/usr/sbin/diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
+    local systemVolumePath="/Volumes/$systemVolume"
+    echo "Log: $(date "+%F %T") Checking \"$account\" for volume ownership." | tee -a "$logPath"
+    for id in $(/usr/sbin/diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
     do
-        username=$(basename "$user")
-        if sysadminctl -secureTokenStatus "$username" 2>&1 | grep -q 'ENABLED';
+        if [[ "$id" == "$accountGUID" ]];
         then
-            secureTokenUserArray+=("$username")
+            echo "Log: $(date "+%F %T") \"$account\" is a volume owner." | tee -a "$logPath"
+            volumeOwner=true
+            return 0
         fi
     done
-    if [[ -z "$secureTokenUserArray" ]];
+    if [[ "$volumeOwner" != true ]];
     then
-        userList="No secure token accounts available.\n\nPlease contact the IT Service Desk at (314)-977-4000."
-        phrase=$(echo "$userList")
-    else
-        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        phrase=$(echo -e "Log in as one of the following accounts:\n$userList")
-    fi
-}
-
-# Check current user for volume ownership
-function check_CurrentUser_Ownership() {
-    currentUserOwner=false
-    currentUserGUID=$(dscl . -read /Users/$currentUser GeneratedUID | awk '{print $2}')
-    systemVolume=$(diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
-    systemVolumePath="/Volumes/$systemVolume"
-    for id in $(diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
-    do
-        if [[ "$id" == "$currentUserGUID" ]];
-        then
-            currentUserOwner=true
-        fi
-    done
-    if [[ "$currentUserOwner" != true ]];
-    then
-        osascript -e "display dialog \"You are not a volume owner! Your account does not have the proper permission to update.\n\n$phrase\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        echo "Log: $(date "+%F %T") \"$currentUser\" is not a volume owner, exiting." | tee -a "$logPath"
-        exit 0
+        echo "Log: $(date "+%F %T") \"$account\" is not a volume owner." | tee -a "$logPath"
+        return 1
     fi
 }
 
 # Dialog box to inform user the update is installing
 function update_Prompt() {
-    updatePrompt=$(osascript <<OOP
-    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the update is finished downloading, your device will restart.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "/usr/local/jamfconnect/SLU.icns" with title "SLU ITS: OS Update" giving up after 900)
+    local updatePrompt=$(/usr/bin/osascript <<OOP
+    set updatePrompt to (display dialog "Your device is downloading the update in the background!\n\nOnce the download is finished, your device will automatically restart to apply the changes. If you don't see any updates after an hour, please try restarting your device and running this policy again.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"OK"} default button "OK" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of updatePrompt is equal to "OK" then
         return "OK"
     else
@@ -230,65 +219,105 @@ OOP
     )
     if [[ "$updatePrompt" == 'OK' ]];
     then
-        echo "Log: $(date "+%F %T") User selected \"OK\" through the final update dialog box" | tee -a "$logPath"
-        osascript -e 'tell application "Terminal" to do script "caffeinate -d"'
+        echo "Log: $(date "+%F %T") User selected \"OK\" through the final dialog box." | tee -a "$logPath"
+        /usr/bin/osascript -e 'tell application "Terminal" to do script "caffeinate -d"'
     fi
 }
 
 function main() {
-    echo "Log: $(date "+%F %T") Beginning Software Update Push script" | tee "$logPath"
+    echo "Log: $(date "+%F %T") Beginning Software Update script." | tee "$logPath"
 
     if ! icon_Check;
     then
-        echo "Log: $(date "+%F %T") Exiting for no SLU icon" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting for no SLU icon." | tee -a "$logPath"
         exit 1
     fi
     
     if ! login_Check;
     then
-        echo "Log: $(date "+%F %T") Exiting for invalid user logged in" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting for invalid user logged in." | tee -a "$logPath"
         exit 1
     fi
 
     if ! update_Check;
     then
-        echo "Log: $(date "+%F %T") No updates available" | tee -a "$logPath"
-        osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"/usr/local/jamfconnect/SLU.icns\" with title \"SLU ITS: OS Update\""
-        exit 0
+        echo "Log: $(date "+%F %T") No updates available, checking again" | tee -a "$logPath"
+        if ! update_Check;
+        then
+            echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
+            /usr/bin/osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
+            exit 0
+        fi
     fi
 
-    # function specific to the pushed version of this script
-    if ! user_Prompt;
-    then
-        echo "Log: Exiting at first user prompt" | tee -a "$logPath"
-        exit 1
-    fi
-
-    # Return 1 should not be possible here due to there being no cancel button
     if ! prompt_User;
     then
-        echo "Log: $(date "+%F %T") Exiting at user prompt" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
         exit 1
     fi
 
-    if [[ $(uname -p) == 'arm' ]];
+    # To upgrade on Apple Silicon, the user needs to have a secure token and they will be prompted for their password.
+    # If they do not have a secure token, it will check for our management account to exist with the proper permissions.
+    # If that exists, it will use the management account to grant the user a secure token.
+    if [[ $(/usr/bin/uname -p) == 'arm' ]];
     then
-        gather_SecureToken_UserList
-        check_CurrentUser_Ownership
-
-        # Return 1 is only possible here due to the option to type cancel as your password
-        if ! password_Prompt;
+        if ! check_Ownership "$currentUser";
         then
-            echo "Log: $(date "+%F %T") Exiting" | tee -a "$logPath"
-            exit 1
+            echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
+            if ! account_Check "$managementAccount";
+            then
+                echo "Log: $(date "+%F %T") Management account does not exist, exiting." | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not exist. Unable to grant the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
+                exit 1
+            fi
+
+            if ! admin_Check "$managementAccount";
+            then
+                echo "Log: $(date "+%F %T") Management account not an admin, exiting." | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to grant the proper permission to continue with the update." as critical buttons {"OK"} default button "OK" giving up after 900'
+                exit 1
+            fi
+            
+            if ! check_Ownership "$managementAccount";
+            then
+                echo "Log: $(date "+%F %T") Management account does not have volume ownership, exiting." | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not have volume ownership. Unable to assign secure token." as critical buttons {"OK"} default button "OK" giving up after 900'
+                exit 1
+            fi
+
+            if ! password_Prompt;
+            then
+                echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+                exit 1
+            fi
+
+            if ! assign_Token;
+            then
+                echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting." | tee -a "$logPath"
+                /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
+                exit 1
+            fi
+        fi
+
+        if [ "$passwordPromptBool" = true ];
+        then
+            echo "Log: $(date "+%F %T") Already asked for password, continuing." | tee -a "$logPath"
+        else
+            if ! password_Prompt;
+            then
+                echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+                exit 1
+            fi
         fi
 
         update_Prompt
-        echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Beginning download of update." | tee -a "$logPath"
         /usr/sbin/softwareupdate -i -a --restart --agree-to-license --verbose --user "$currentUser" --stdinpass "$currentUserPassword"
+
+    # Intel device upgrade path
     else
         update_Prompt
-        echo "Log: $(date "+%F %T") Beginning download of update" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Beginning download of update." | tee -a "$logPath"
         /usr/sbin/softwareupdate -i -a --restart --agree-to-license --verbose
     fi
 

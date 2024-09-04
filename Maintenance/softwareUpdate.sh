@@ -123,10 +123,10 @@ function prompt_User() {
     local promptMessage=""
     if ((updateCount > 1));
     then
-        promptMessage="You have more than one OS update available, you will need to run this policy for each available update.\n\nAvailable Updates:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
+        promptMessage="You have more than one update available, you will need to run this policy for each available update.\n\nAvailable Updates:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
     elif ((updateCount == 1));
     then
-        promptMessage="You have one OS update available.\n\nAvailable Update:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
+        promptMessage="You have one update available.\n\nAvailable Update:\n$cleanUpdateList\n\nYour device will restart when the download is complete. Save all of your files before proceeding.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
     fi
     local userPrompt=$(/usr/bin/osascript <<OOP
     set dialogResult to (display dialog "$promptMessage" buttons {"Cancel", "Begin Download and Install"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
@@ -241,9 +241,13 @@ function main() {
 
     if ! update_Check;
     then
-        echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
-        /usr/bin/osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
-        exit 0
+        echo "Log: $(date "+%F %T") No updates available, checking again" | tee -a "$logPath"
+        if ! update_Check;
+        then
+            echo "Log: $(date "+%F %T") No updates available." | tee -a "$logPath"
+            /usr/bin/osascript -e "display dialog \"Your device's OS is fully up to date! Thank you.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
+            exit 0
+        fi
     fi
 
     if ! prompt_User;
