@@ -3,14 +3,15 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 8-27-24   ###
-### Updated: 8-27-24   ###
-### Version: 1.0       ###
+### Updated: 9-13-24   ###
+### Version: 1.1       ###
 ##########################
 
 managementAccount="$4"
 managementAccountPass="$5"
 elevatedAccount="$6"
 elevatedAccountPass=""
+elevatedAccountPassVerify=""
 currentUserPassword=""
 readonly elevatedAccountPath="/Users/$elevatedAccount"
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
@@ -80,47 +81,33 @@ function admin_Check(){
 # Prompt the user for their password, reprompting if they enter nothing
 function password_Prompt(){
     local phrase="$1"
-    local attempts=3
-    local password
-    local verified
     local readonly passwordTitle='SLU ITS: Password Prompt'
-    while [[ $attempts -gt 0 ]];
-    do
-        /usr/bin/osascript -e "set userPassword to (display dialog \"$phrase:\" buttons {\"Cancel\", \"OK\"} default button \"OK\" with hidden answer default answer \"\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\" giving up after 900)"
-        if [[ "$userPassword" == 'Cancel' ]];
-        then
-            echo "Log: $(date "+%F %T") User selected cancel." | tee -a "$logPath"
-            return 1
-        elif [[ -z "$userPassword" ]];
-        then
-            echo "Log: $(date "+%F %T") No password entered." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "You did not enter a password. Please try again." as critical buttons {"OK"} default button "OK" giving up after 900'
-            password_Prompt "$phrase"
-        elif [[ "$userPassword" == 'timeout' ]];
-        then
-            echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
-            password_Prompt "$phrase"
+    echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
+    currentUserPassword=$(/usr/bin/osascript <<OOP
+        set currentUserPassword to (display dialog "$phrase" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$iconPath" with title "$passwordTitle" giving up after 900)
+        if button returned of currentUserPassword is equal to "OK" then
+            return text returned of currentUserPassword
         else
-            password="$userPassword"
-            /usr/bin/osascript -e "set confirmedPassword to (display dialog \"$phrase:\" buttons {\"Cancel\", \"OK\"} default button \"OK\" with hidden answer default answer \"\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\" giving up after 900)"
-            if [[ "$userPassword" == "$confirmedPassword" ]];
-            then
-                echo "Passwords match"
-                verified=true
-                break
-            else
-                echo "passwords do not match"
-                attempts=$((attempts - 1))
-            fi
-            if [[ ! $verified ]];
-            then
-                echo "Password verification failed"
-                return 1
-            fi
-
-            echo "$password"
-        fi
-    done
+            return "timeout"
+        end if
+OOP
+    )
+    if [[ $? != 0 ]];
+    then
+        echo "Log: $(date "+%F %T") User selected cancel." | tee -a "$logPath"
+        return 1
+    elif [[ -z "$currentUserPassword" ]];
+    then
+        echo "Log: $(date "+%F %T") No password entered." | tee -a "$logPath"
+        /usr/bin/osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\""
+        password_Prompt "$phrase"
+    elif [[ "$currentUserPassword" == 'timeout' ]];
+    then
+        echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
+        password_Prompt "$phrase"
+    fi
+    echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
+    return 0
 }
 
 # Creates account with a home folder and proper permissions
@@ -206,6 +193,8 @@ function main() {
     fi
     echo "Log: $(date "+%F %T") Check for SLU icon complete." | tee -a "$logPath"
 
+
+
     # Check for valid user being logged in
     echo "Log: $(date "+%F %T") Checking for currently logged in user." | tee -a "$logPath"
     if ! login_Check;
@@ -214,6 +203,8 @@ function main() {
         exit 1
     fi
     echo "Log: $(date "+%F %T") Check for currently logged in user complete." | tee -a "$logPath"
+
+
 
     # Check if management account exists
     echo "Log: $(date "+%F %T") Checking for \"$managementAccount\"." | tee -a "$logPath"
@@ -225,14 +216,18 @@ function main() {
     fi
     echo "Log: $(date "+%F %T") Check for \"$managementAccount\" complete." | tee -a "$logPath"
 
+
+
     # Check if elevate account exists
     echo "Log: $(date "+%F %T") Checking for \"$elevatedAccount\"." | tee -a "$logPath"
-    if account_Check "elevate";
+    if account_Check "$elevatedAccount";
     then
         echo "Log: $(date "+%F %T") Elevate account already exists, exiting." | tee -a "$logPath"
         exit 1
     fi
     echo "Log: $(date "+%F %T") Check for \"$elevatedAccount\" complete." | tee -a "$logPath"
+
+
 
     # Check if management account is an admin
     echo "Log: $(date "+%F %T") Checking for \"$managementAccount\" to be an admin." | tee -a "$logPath"
@@ -244,9 +239,33 @@ function main() {
     fi
     echo "Log: $(date "+%F %T") Check for \"$managementAccount\" to be an admin complete." | tee -a "$logPath"
 
+
+
     # Prompt user for elevated account password
     echo "Log: $(date "+%F %T") Prompting user for elevated account password." | tee -a "$logPath"
+    if ! password_Prompt "Please enter the password you would like to use for your admin account:";
+    then
+        echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+        exit 1
+    fi
+    elevatedAccountPass=${currentUserPassword}
+    echo "Log: $(date "+%F %T") Prompting user again for elevated account password." | tee -a "$logPath"
+    if ! password_Prompt "Please verify the password you would like to use for your admin account:";
+    then
+        echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+        exit 1
+    fi
+    elevatedAccountPassVerify=${currentUserPassword}
+    if [ "$elevatedAccountPass" = "$elevatedAccountPassVerify" ];
+    then
+        echo "Log: $(date "+%F %T") Passwords matched, continuing." | tee -a "$logPath"
+    else
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Passwords did not match, exiting." as critical buttons {"OK"} default button "OK" giving up after 900'
+        exit 1
+    fi
     echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
+
+
 
     # Attempt to create elevated account using management account
     echo "Log: $(date "+%F %T") Creating elevated account." | tee -a "$logPath"
@@ -258,13 +277,20 @@ function main() {
     fi
     echo "Log: $(date "+%F %T") Creation of elevated account complete." | tee -a "$logPath"
 
+
+
     # Check user for secure token, assign one using management account, if possible
     if ! check_Ownership "$currentUser";
     then
-        if ! check_Ownership "$managementAccount";
+        if check_Ownership "$managementAccount";
         then
             echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
             echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
+            if ! password_Prompt "Please enter your computer password:";
+            then
+                echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+                exit 1
+            fi
             echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
 
             # Attempt to assign secure token
