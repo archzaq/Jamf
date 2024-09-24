@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 8-27-24   ###
-### Updated: 9-13-24   ###
-### Version: 1.1       ###
+### Updated: 9-24-24   ###
+### Version: 1.2       ###
 ##########################
 
 managementAccount="$4"
