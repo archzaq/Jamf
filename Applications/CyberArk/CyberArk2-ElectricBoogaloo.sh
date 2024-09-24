@@ -3,7 +3,7 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-6-24    ###
-### Updated: 9-20-24   ###
+### Updated: 9-24-24   ###
 ### Version: 2.4       ###
 ##########################
 
@@ -12,13 +12,11 @@ managementAccountPass="$5"
 managementAccountPath="/Users/$managementAccount"
 tempAccount="$6"
 tempAccountPassword="$7"
-#loggedInUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
-#loggedInUserPassword=''
 currentUserPassword=''
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly logPath='/var/log/cyberarkFix.log'
-readonly iconPath="/usr/local/jamfconnect/SLU.icns"
-readonly dialogTitle="SLU ITS: CyberArk Installation"
+readonly iconPath='/usr/local/jamfconnect/SLU.icns'
+readonly dialogTitle='SLU ITS: CyberArk Installation'
 
 # Check for SLU icon file, applescript dialog boxes will error without it
 function icon_Check() {
@@ -79,11 +77,13 @@ function admin_Check(){
     fi
 }
 
-# Add user to admin group using temp account credentials
+# Add user to admin group
 function add_Account_To_AdminGroup() {
     local account="$1"
+    local adminAccount="$2"
+    local adminPassword="$3"
 
-    /usr/sbin/dseditgroup -o edit -a "$account" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin 
+    /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin 
 
     # Double checks user to be in the admin group
     if admin_Check "$account";
@@ -94,17 +94,26 @@ function add_Account_To_AdminGroup() {
     fi
 }
 
-# Check if account has secure token
-function secure_Token_Check() {
+# Remove user to admin group
+function remove_Account_From_AdminGroup() {
     local account="$1"
+    local adminAccount="$2"
+    local adminPassword="$3"
 
-    if /usr/sbin/sysadminctl -secureTokenStatus "$account" 2>&1 | grep -q 'ENABLED';
+    if [ "$existingAdmin" != true ];
     then
-        echo "Log: \"$account\" has a secure token"
-        return 0
+        /usr/sbin/dseditgroup -o edit -d "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin 
+
+        # Double checks user to not be in the admin group
+        if admin_Check "$account";
+        then
+            return 1
+        else
+            return 0
+        fi
     else
-        echo "Log: \"$account\" does not have a secure token"
-        return 1
+        echo "Log: $(date "+%F %T") Leaving user as admin." | tee -a "$logPath"
+        return 0
     fi
 }
 
@@ -142,11 +151,16 @@ OOP
 
 # Assigns secure token to current user using management account
 function assign_Token(){
+    local adminAccount="$1"
+    local adminPassword="$2"
+    local tokenEnableAccount="$3"
+    local tokenEnablePassword="$4"
+
     # Test the sysadminctl command for a success before actually attempting to grant a secure token
-    local secureTokenTest=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword" -test 2>&1)
+    local secureTokenTest=$(/usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPassword" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePassword" -test 2>&1)
     if [[ $secureTokenTest == *"Done"* ]];
     then
-        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword"
+        /usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPassword" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePassword"
         echo "Log: $(date "+%F %T") Success assigning secure token!" | tee -a "$logPath"
         return 0
     else
@@ -160,9 +174,9 @@ function create_Account() {
     local accountAdd="$1"
     local accountAddPass="$2"
     local accountAddPath="$3"
-    local managementAccount="$4"
-    local managementAccountPass="$5"
-    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$managementAccount" -adminPassword "$managementAccountPass";
+    local adminAccount="$4"
+    local adminPassword="$5"
+    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPassword";
     then
         echo "Log: $(date "+%F %T") \"$accountAdd\" created." | tee -a "$logPath"
         if account_Check "$accountAdd";
@@ -184,28 +198,6 @@ function create_Account() {
     else
         echo "Log: $(date "+%F %T") \"$accountAdd\" could not be created." | tee -a "$logPath"
         return 1
-    fi
-}
-
-# Gather an array of user accounts with secure tokens to be displayed as a list in check_LoggedInUser_Ownership
-function gather_SecureToken_UserList() {
-    secureTokenUserArray=()
-    userList=""
-    for user in $(ls /Users/ | grep -vE '^(Shared|loginwindow|\..*)');
-    do
-        username=$(/usr/bin/basename "$user")
-        if secure_Token_Check "$username";
-        then
-            secureTokenUserArray+=("$username")
-        fi
-    done
-    if [[ -z "$secureTokenUserArray" ]];
-    then
-        userList="No secure token accounts available.\n\nPlease contact the IT Service Desk at (314)-977-4000."
-        phrase=$(echo "$userList")
-    else
-        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        phrase=$(echo -e "Log in as one of the following accounts:\n$userList")
     fi
 }
 
@@ -237,12 +229,12 @@ function check_Ownership() {
 function user_Prompt() {
     if [[ $promptCounter -ge 5 ]];
     then
-        echo "Log: Prompted five times with no response, exiting"
+        echo "Log: $(date "+%F %T") Prompted five times with no response, exiting." | tee "$logPath"
         return 1
     fi
 
     userPrompt=$(osascript <<OOP
-    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$icon" with title "$title" giving up after 900)
+    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of userPrompt is equal to "Continue" then
         return "Continue"
     else
@@ -252,10 +244,10 @@ OOP
     )
     if [[ "$userPrompt" == 'Continue' ]];
     then
-        echo "Log: User selected \"Continue\" through the first dialog box"
+        echo "Log: $(date "+%F %T") User selected \"Continue\" through the first dialog box." | tee "$logPath"
         return 0
     else
-        echo "Log: Reprompting user with the first dialog box"
+        echo "Log: $(date "+%F %T") Reprompting user with the first dialog box." | tee "$logPath"
         ((promptCounter++))
         user_Prompt
     fi
@@ -265,12 +257,12 @@ OOP
 function final_Check() {
     local account="$1"
     
-    if account_Check "$account" && admin_Check "$account" && secure_Token_Check "$account";
+    if account_Check "$account" && admin_Check "$account" && check_Ownership "$account";
     then
-        echo "Log: Final check passed! CyberArk ready for install"
+        echo "Log: $(date "+%F %T") Final check passed! CyberArk ready for install." | tee "$logPath"
         return 0
     else
-        echo "Log: Final check failed!!"
+        echo "Log: $(date "+%F %T") Final check failed!" | tee "$logPath"
         return 1
     fi
 }
@@ -280,6 +272,7 @@ function exitError() {
     if account_Check "$tempAccount";
     then
         /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+        echo "Log: $(date "+%F %T") Temp account deleted." | tee "$logPath"
     fi
     exit 1
 }
@@ -331,60 +324,106 @@ function main() {
             /usr/bin/osascript -e 'display alert "An error has occurred" message "There was an issue with creating management account. Unable to proceed." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
-        echo "Log: $(date "+%F %T") Creation of \"$managementAccount\" complete." | tee -a "$logPath"
     fi
     echo "Log: $(date "+%F %T") Check for \"$managementAccount\" complete." | tee -a "$logPath"
 
 
 
-    # Prompt user with the action to take place
-    if ! user_Prompt;
-    then
-        exitError
-    fi
-
     # If management account is not an admin, assign it to admin group using temp account credentials
+    echo "Log: $(date "+%F %T") Checking for \"$managementAccount\" to be an admin." | tee -a "$logPath"
     if ! admin_Check "$managementAccount";
     then
-        if ! add_Account_To_AdminGroup "$managementAccount";
+        echo "Log: $(date "+%F %T")Management account is not an admin, attempting to add to admin group." | tee -a "$logPath"
+        if ! add_Account_To_AdminGroup "$managementAccount" "$tempAccount" "$tempAccountPassword";
         then
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            exitError
+        fi
+    fi
+    echo "Log: $(date "+%F %T") Check for \"$managementAccount\" to be an admin complete." | tee -a "$logPath"
+
+
+
+    # Prompt user with the action to take place
+    echo "Log: $(date "+%F %T") Informing user of CyberArk install." | tee -a "$logPath"
+    if ! user_Prompt;
+    then
+        echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
+        exitError
+    fi
+    echo "Log: $(date "+%F %T") Informed user of CyberArk install." | tee -a "$logPath"
+
+
+
+    # If its_admin is without a secure token, check the current user for one
+    if ! check_Ownership "$managementAccount";
+    then
+        echo "Log: $(date "+%F %T") Checking current user for a secure token that can be assigned to management account." | tee -a "$logPath"
+        if check_Ownership "$currentUser";
+        then
+            if ! password_Prompt "Please enter your computer password:";
+            then
+                echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+                exitError
+            fi
+            echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
+        else
+            echo "Log: $(date "+%F %T") Current user had no secure token, exiting." | tee -a "$logPath"
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
     fi
 
-    # Gather list of secure token accounts to display if loggedInUser doesnt have one
-    gather_SecureToken_UserList
-    if ! check_LoggedInUser_Ownership;
+
+
+    # If the user is not an admin, temporarily add the current user to the admin group to use their secure token
+    if ! admin_Check "$currentUser";
     then
-        exitError
+        # Add current user to admin group
+        if ! add_Account_To_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        then
+            echo "Log: $(date "+%F %T") Unable to grant temporary admin to current user, exiting." | tee -a "$logPath"
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            exitError
+        fi
+    else
+        existingAdmin=true
     fi
 
-    # If management account doesnt have a secure token, ask for their password, then grant admin only to assign a token
-    if ! secure_Token_Check "$managementAccount";
+    # Assign token to management account
+    if ! assign_Token "$currentUser" "$currentUserPassword" "$managementAccount" "$managementAccountPass";
     then
-        if ! admin_Check "$loggedInUser";
-        then
-            if ! password_Prompt;
-            then
-                exitError
-            fi
+        echo "Log: $(date "+%F %T") Current user unable to grant a secure token, exiting." | tee -a "$logPath"
 
-            if add_Account_To_AdminGroup "$loggedInUser";
-            then
-                assign_Token
-                /usr/sbin/dseditgroup -o edit -d "$loggedInUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
-            else
-                echo "Log: Failed to add \"$loggedInUser\" to admin group"
-                exitError
-            fi
+        # Remove current user from admin group
+        if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        then
+            echo "Log: $(date "+%F %T") Unable to remove temporary admin to current user, exiting." | tee -a "$logPath"
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/sbin/dseditgroup -o edit -d "$currentUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
+            exitError
         else
-            if ! password_Prompt;
-            then
-                exitError
-            fi
-            assign_Token
+            echo "Log: $(date "+%F %T") Successfully removed temporary admin from current user." | tee -a "$logPath"
+        fi
+
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
+        exitError
+    else
+        echo "Log: $(date "+%F %T") Successfully assigned secure token to management account." | tee -a "$logPath"
+
+        # Remove current user from admin group
+        if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        then
+            echo "Log: $(date "+%F %T") Unable to remove temporary admin to current user, exiting." | tee -a "$logPath"
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/sbin/dseditgroup -o edit -d "$currentUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
+            exitError
+        else
+            echo "Log: $(date "+%F %T") Successfully removed temporary admin from current user." | tee -a "$logPath"
         fi
     fi
+
+
 
     # Final check to make sure management account is ready for CyberArk install
     if final_Check "$managementAccount";
@@ -394,8 +433,8 @@ function main() {
         /usr/local/bin/jamf policy -event CyberArk
         exit 0
     else
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions.\n\nDouble check your password." as critical buttons {"OK"} default button "OK"'
-        main
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions." as critical buttons {"OK"} default button "OK"'
+        exitError
     fi
 }
 
