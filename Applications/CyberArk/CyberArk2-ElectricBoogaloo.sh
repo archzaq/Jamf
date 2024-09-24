@@ -316,6 +316,17 @@ function main() {
 
 
 
+    # Prompt user with the action to take place
+    echo "Log: $(date "+%F %T") Informing user of CyberArk install." | tee -a "$logPath"
+    if ! user_Prompt;
+    then
+        echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
+        exitError
+    fi
+    echo "Log: $(date "+%F %T") Informing user of CyberArk install complete." | tee -a "$logPath"
+
+
+
     # Check if management account exists, create it if not
     echo "Log: $(date "+%F %T") Checking for \"$managementAccount\"." | tee -a "$logPath"
     if ! account_Check "$managementAccount";
@@ -343,17 +354,6 @@ function main() {
         fi
     fi
     echo "Log: $(date "+%F %T") Check for \"$managementAccount\" to be an admin complete." | tee -a "$logPath"
-
-
-
-    # Prompt user with the action to take place
-    echo "Log: $(date "+%F %T") Informing user of CyberArk install." | tee -a "$logPath"
-    if ! user_Prompt;
-    then
-        echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
-        exitError
-    fi
-    echo "Log: $(date "+%F %T") Informing user of CyberArk install complete." | tee -a "$logPath"
 
 
 
