@@ -163,10 +163,8 @@ function assign_Token(){
     if [[ $secureTokenTest == *"Done"* ]];
     then
         /usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPassword" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePassword"
-        echo "Log: $(date "+%F %T") Success assigning secure token!" | tee -a "$logPath"
         return 0
     else
-        echo "Log: $(date "+%F %T") Error with sysadminctl command." | tee -a "$logPath"
         return 1
     fi
 }
@@ -410,7 +408,7 @@ function main() {
         /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
         exitError
     else
-        echo "Log: $(date "+%F %T") Successfully assigned secure token to management account." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Successfully assigned secure token to management account!" | tee -a "$logPath"
 
         # Remove current user from admin group
         if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
