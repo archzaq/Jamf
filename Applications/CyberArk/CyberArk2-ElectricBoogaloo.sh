@@ -313,6 +313,17 @@ function main() {
     echo "Log: $(date "+%F %T") Check for temporary account complete." | tee -a "$logPath"
 
 
+    # Precheck current user for secure token
+    echo "Log: $(date "+%F %T") Pre-checking \"$currentUser\" for secure token." | tee -a "$logPath"
+    if ! check_Ownership "$currentUser";
+    then
+        echo "Log: $(date "+%F %T") \"$currentUser\" has no secure token, exiting." | tee -a "$logPath"
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+        exitError
+    fi
+    echo "Log: $(date "+%F %T") Pre-check \"$currentUser\" for secure token complete." | tee -a "$logPath"
+
+
 
     # Prompt user with the action to take place
     echo "Log: $(date "+%F %T") Informing user of CyberArk install." | tee -a "$logPath"
