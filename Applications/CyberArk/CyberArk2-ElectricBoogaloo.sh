@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-6-24    ###
-### Updated: 9-24-24   ###
-### Version: 2.4       ###
+### Updated: 10-1-24   ###
+### Version: 2.5       ###
 ##########################
 
 managementAccount="$4"
@@ -17,6 +17,16 @@ readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | a
 readonly logPath='/var/log/cyberarkFix.log'
 readonly iconPath='/usr/local/jamfconnect/SLU.icns'
 readonly dialogTitle='SLU ITS: CyberArk Installation'
+
+# Check external variables
+function pre_Check() {
+    if [ -z "$managementAccount" ] || [ -z "$managementAccountPass" ] || [ -z "$tempAccount" ] || [ -z "$tempAccountPassword" ];
+    then
+        echo "Log: $(date "+%F %T") Missing prerequisites." | tee -a "$logPath"
+        return 1
+    fi
+    return 0
+}
 
 # Check for SLU icon file, applescript dialog boxes will error without it
 function icon_Check() {
@@ -281,6 +291,17 @@ function main() {
     promptCounter=0
     echo "Log: $(date "+%F %T") Beginning CyberArk fix script." | tee "$logPath"
 
+    # Check for prerequisites
+    echo "Log: $(date "+%F %T") Checking for prerequisites." | tee -a "$logPath"
+    if ! pre_Check;
+    then
+        echo "Log: $(date "+%F %T") Exiting for missing prerequisites." | tee -a "$logPath"
+        exitError
+    fi
+    echo "Log: $(date "+%F %T") Check for prerequisites complete." | tee -a "$logPath"
+
+
+
     # Check for SLU icon file
     echo "Log: $(date "+%F %T") Checking for SLU icon." | tee -a "$logPath"
     if ! icon_Check;
@@ -312,18 +333,7 @@ function main() {
     fi
     echo "Log: $(date "+%F %T") Check for temporary account complete." | tee -a "$logPath"
 
-
-    # Precheck current user for secure token
-    echo "Log: $(date "+%F %T") Pre-checking \"$currentUser\" for secure token." | tee -a "$logPath"
-    if ! check_Ownership "$currentUser";
-    then
-        echo "Log: $(date "+%F %T") \"$currentUser\" has no secure token, exiting." | tee -a "$logPath"
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
-        exitError
-    fi
-    echo "Log: $(date "+%F %T") Pre-check \"$currentUser\" for secure token complete." | tee -a "$logPath"
-
-
+    
 
     # Prompt user with the action to take place
     echo "Log: $(date "+%F %T") Informing user of CyberArk install." | tee -a "$logPath"
@@ -336,6 +346,18 @@ function main() {
 
 
 
+    # Check current user for secure token
+    echo "Log: $(date "+%F %T") Pre-checking \"$currentUser\" for secure token." | tee -a "$logPath"
+    if ! check_Ownership "$currentUser";
+    then
+        echo "Log: $(date "+%F %T") \"$currentUser\" has no secure token, exiting." | tee -a "$logPath"
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
+        exitError
+    fi
+    echo "Log: $(date "+%F %T") Pre-check \"$currentUser\" for secure token complete." | tee -a "$logPath"
+
+
+
     # Check if management account exists, create it if not
     echo "Log: $(date "+%F %T") Checking for \"$managementAccount\"." | tee -a "$logPath"
     if ! account_Check "$managementAccount";
@@ -343,7 +365,7 @@ function main() {
         if ! create_Account "$managementAccount" "$managementAccountPass" "$managementAccountPath" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Exiting at account creation." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "There was an issue with creating management account. Unable to proceed." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "There was an issue with creating management account. Unable to proceed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
     fi
@@ -358,7 +380,7 @@ function main() {
         echo "Log: $(date "+%F %T")Management account is not an admin, attempting to add to admin group." | tee -a "$logPath"
         if ! add_Account_To_AdminGroup "$managementAccount" "$tempAccount" "$tempAccountPassword";
         then
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
     fi
@@ -379,7 +401,7 @@ function main() {
             fi
         else
             echo "Log: $(date "+%F %T") \"$currentUser\" had no secure token, exiting." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
     fi
@@ -393,12 +415,14 @@ function main() {
         if ! add_Account_To_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to grant temporary admin to current user, exiting." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
         fi
     else
         existingAdmin=true
     fi
+
+
 
     # Assign token to management account
     if ! assign_Token "$currentUser" "$currentUserPassword" "$managementAccount" "$managementAccountPass";
@@ -409,14 +433,14 @@ function main() {
         if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to remove temporary admin from \"$currentUser\", exiting." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             /usr/sbin/dseditgroup -o edit -d "$currentUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
             exitError
         else
             echo "Log: $(date "+%F %T") Successfully removed temporary admin rights from \"$currentUser\"." | tee -a "$logPath"
         fi
 
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command." as critical buttons {"OK"} default button "OK" giving up after 900'
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Unable to assign secure token. Issue with sysadminctl command.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
         exitError
     else
         echo "Log: $(date "+%F %T") Successfully assigned secure token to management account!" | tee -a "$logPath"
@@ -425,7 +449,7 @@ function main() {
         if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to remove temporary admin from \"$currentUser\", exiting." | tee -a "$logPath"
-            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation." as critical buttons {"OK"} default button "OK" giving up after 900'
+            /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             /usr/sbin/dseditgroup -o edit -d "$currentUser" -u "$tempAccount" -P "$tempAccountPassword" -t user -L admin
             exitError
         else
@@ -443,7 +467,7 @@ function main() {
         /usr/local/bin/jamf policy -event CyberArk
         exit 0
     else
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions." as critical buttons {"OK"} default button "OK"'
+        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account has not been granted the proper permissions.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK"'
         exitError
     fi
 }
