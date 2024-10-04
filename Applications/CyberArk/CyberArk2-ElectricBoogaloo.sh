@@ -13,6 +13,7 @@ managementAccountPath="/Users/$managementAccount"
 tempAccount="$6"
 tempAccountPassword="$7"
 currentUserPassword=''
+passwordPromptBool=false
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly logPath='/var/log/cyberarkFix.log'
 readonly iconPath='/usr/local/jamfconnect/SLU.icns'
@@ -109,7 +110,7 @@ function removeAccount_AdminGroup() {
     local account="$1"
     local adminAccount="$2"
     local adminPassword="$3"
-    echo "Log: $(date "+%F %T") Attempting to remove temporary admin from \"$currentUser\"." | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") Attempting to remove temporary admin from \"$account\"." | tee -a "$logPath"
     if [ "$existingAdmin" != true ];
     then
         /usr/sbin/dseditgroup -o edit -d "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin 
@@ -154,6 +155,7 @@ OOP
         password_Prompt "$phrase"
     fi
     echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
+    passwordPromptBool=true
     return 0
 }
 
@@ -285,6 +287,19 @@ function main() {
     promptCounter=0
     echo "Log: $(date "+%F %T") Beginning CyberArk fix script." | tee "$logPath"
 
+
+
+    # Final check to make sure management account is ready for CyberArk install
+    if final_Check "$managementAccount";
+    then
+        /usr/sbin/sysadminctl -deleteUser "$tempAccount" -secure
+        /usr/bin/osascript -e "display dialog \"Excellent!\\n\\nBeginning installation of CyberArk now.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$dialogTitle\""
+        /usr/local/bin/jamf policy -event CyberArk
+        exit 0
+    fi
+
+
+
     # Check for prerequisites
     echo "Log: $(date "+%F %T") Checking for prerequisites." | tee -a "$logPath"
     if ! pre_Check;
@@ -336,7 +351,7 @@ function main() {
 
 
     # Check current user for secure token
-    echo "Log: $(date "+%F %T") Pre-checking \"$currentUser\" for secure token." | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") Checking \"$currentUser\" for secure token before continuing." | tee -a "$logPath"
     if ! check_Ownership "$currentUser";
     then
         echo "Log: $(date "+%F %T") \"$currentUser\" has no secure token, exiting." | tee -a "$logPath"
@@ -392,6 +407,18 @@ function main() {
         fi
     fi
 
+
+
+    # Prompt for password if it was missed before attempting to assign token
+    if [ "$passwordPromptBool" != true ];
+    then
+        if ! password_Prompt "Please enter your computer password:";
+        then
+            echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
+            exitError
+        fi
+    fi
+ 
 
 
     # If the user is not an admin, temporarily add the current user to the admin group to use their secure token
