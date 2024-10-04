@@ -37,7 +37,7 @@ function icon_Check() {
         /usr/local/bin/jamf policy -event SLUFonts
         if [[ ! -f "$iconPath" ]];
         then
-            echo "Log: $(date "+%F %T") No SLU icon found, exiting." | tee -a "$logPath"
+            echo "Log: $(date "+%F %T") Unable to locate SLU icon found." | tee -a "$logPath"
             return 1
         fi
     fi
@@ -90,15 +90,12 @@ function admin_Check(){
 }
 
 # Add user to admin group
-function add_Account_To_AdminGroup() {
+function addAccount_AdminGroup() {
     local account="$1"
     local adminAccount="$2"
     local adminPassword="$3"
-
     echo "Log: $(date "+%F %T") Attempting to grant temporary admin to \"$currentUser\"." | tee -a "$logPath"
     /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin 
-
-    # Double checks user to be in the admin group
     if admin_Check "$account";
     then
         return 0
@@ -107,18 +104,15 @@ function add_Account_To_AdminGroup() {
     fi
 }
 
-# Remove user to admin group
-function remove_Account_From_AdminGroup() {
+# Remove user from admin group
+function removeAccount_AdminGroup() {
     local account="$1"
     local adminAccount="$2"
     local adminPassword="$3"
-
     echo "Log: $(date "+%F %T") Attempting to remove temporary admin from \"$currentUser\"." | tee -a "$logPath"
     if [ "$existingAdmin" != true ];
     then
         /usr/sbin/dseditgroup -o edit -d "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin 
-
-        # Double checks user to not be in the admin group
         if admin_Check "$account";
         then
             return 1
@@ -244,7 +238,6 @@ function user_Prompt() {
         echo "Log: $(date "+%F %T") Prompted five times with no response, exiting." | tee "$logPath"
         return 1
     fi
-
     userPrompt=$(osascript <<OOP
     set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
     if button returned of userPrompt is equal to "Continue" then
@@ -268,7 +261,6 @@ OOP
 # Final check to make sure management account is ready for CyberArk install
 function final_Check() {
     local account="$1"
-    
     if account_Check "$account" && admin_Check "$account" && check_Ownership "$account";
     then
         echo "Log: $(date "+%F %T") Final check passed! CyberArk ready for install." | tee "$logPath"
@@ -373,7 +365,7 @@ function main() {
     if ! admin_Check "$managementAccount";
     then
         echo "Log: $(date "+%F %T")Management account is not an admin, attempting to add to admin group." | tee -a "$logPath"
-        if ! add_Account_To_AdminGroup "$managementAccount" "$tempAccount" "$tempAccountPassword";
+        if ! addAccount_AdminGroup "$managementAccount" "$tempAccount" "$tempAccountPassword";
         then
             /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
             exitError
@@ -406,7 +398,7 @@ function main() {
     if ! admin_Check "$currentUser";
     then
         # Add current user to admin group
-        if ! add_Account_To_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        if ! addAccount_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to grant temporary admin to current user, exiting." | tee -a "$logPath"
             /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
@@ -424,7 +416,7 @@ function main() {
         echo "Log: $(date "+%F %T") \"$currentUser\" unable to grant a secure token, exiting." | tee -a "$logPath"
 
         # Remove current user from admin group
-        if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        if ! removeAccount_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to remove temporary admin from \"$currentUser\", exiting." | tee -a "$logPath"
             /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
@@ -440,7 +432,7 @@ function main() {
         echo "Log: $(date "+%F %T") Successfully assigned secure token to management account!" | tee -a "$logPath"
 
         # Remove current user from admin group
-        if ! remove_Account_From_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
+        if ! removeAccount_AdminGroup "$currentUser" "$tempAccount" "$tempAccountPassword";
         then
             echo "Log: $(date "+%F %T") Unable to remove temporary admin from \"$currentUser\", exiting." | tee -a "$logPath"
             /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
