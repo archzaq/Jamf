@@ -3,7 +3,7 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-6-24    ###
-### Updated: 10-1-24   ###
+### Updated: 10-4-24   ###
 ### Version: 2.5       ###
 ##########################
 
@@ -25,6 +25,7 @@ function pre_Check() {
         echo "Log: $(date "+%F %T") Missing prerequisites." | tee -a "$logPath"
         return 1
     fi
+    echo "Log: $(date "+%F %T") Prerequisites found." | tee -a "$logPath"
     return 0
 }
 
@@ -40,6 +41,7 @@ function icon_Check() {
             return 1
         fi
     fi
+    echo "Log: $(date "+%F %T") SLU icon found." | tee -a "$logPath"
     return 0
 }
 
@@ -298,7 +300,6 @@ function main() {
         echo "Log: $(date "+%F %T") Exiting for missing prerequisites." | tee -a "$logPath"
         exitError
     fi
-    echo "Log: $(date "+%F %T") Check for prerequisites complete." | tee -a "$logPath"
 
 
 
@@ -309,7 +310,6 @@ function main() {
         echo "Log: $(date "+%F %T") Exiting for no SLU icon." | tee -a "$logPath"
         exitError
     fi
-    echo "Log: $(date "+%F %T") Check for SLU icon complete." | tee -a "$logPath"
 
 
 
@@ -320,7 +320,6 @@ function main() {
         echo "Log: $(date "+%F %T")Exiting for invalid user logged in." | tee -a "$logPath"
         exitError
     fi
-    echo "Log: $(date "+%F %T") Check for currently logged in user complete." | tee -a "$logPath"
 
 
 
@@ -331,7 +330,6 @@ function main() {
         echo "Log: $(date "+%F %T")Temporary account does not exist, exiting." | tee -a "$logPath"
         exitError
     fi
-    echo "Log: $(date "+%F %T") Check for temporary account complete." | tee -a "$logPath"
 
     
 
@@ -342,7 +340,6 @@ function main() {
         echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
         exitError
     fi
-    echo "Log: $(date "+%F %T") Informing user of CyberArk install complete." | tee -a "$logPath"
 
 
 
@@ -354,7 +351,6 @@ function main() {
         /usr/bin/osascript -e 'display alert "An error has occurred" message "Your account does not have the proper permission. Unable to proceed with installation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
         exitError
     fi
-    echo "Log: $(date "+%F %T") Pre-check \"$currentUser\" for secure token complete." | tee -a "$logPath"
 
 
 
@@ -369,7 +365,6 @@ function main() {
             exitError
         fi
     fi
-    echo "Log: $(date "+%F %T") Check for \"$managementAccount\" complete." | tee -a "$logPath"
 
 
 
@@ -384,14 +379,13 @@ function main() {
             exitError
         fi
     fi
-    echo "Log: $(date "+%F %T") Check for \"$managementAccount\" to be an admin complete." | tee -a "$logPath"
 
 
 
     # If its_admin is without a secure token, check the current user for one
     if ! check_Ownership "$managementAccount";
     then
-        echo "Log: $(date "+%F %T") Checking \"$currentUser\" for a secure token that can be assigned to management account." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Attempting to use current user for a secure token that can be assigned to management account." | tee -a "$logPath"
         if check_Ownership "$currentUser";
         then
             if ! password_Prompt "Please enter your computer password:";
