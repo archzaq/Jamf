@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 10-29-24  ###
-### Updated: 10-29-24  ###
-### Version: 1.0       ###
+### Updated: 11-7-24   ###
+### Version: 1.1       ###
 ##########################
 
 managementAccount="$4"
@@ -235,13 +235,13 @@ function check_Ownership() {
 
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
-    if [[ $promptCounter -ge 5 ]];
+    if [[ $promptCounter -ge 10 ]];
     then
-        echo "Log: $(date "+%F %T") Prompted five times with no response, exiting." | tee "$logPath"
+        echo "Log: $(date "+%F %T") Prompted ten times with no response, exiting." | tee "$logPath"
         return 1
     fi
     userPrompt=$(osascript <<OOP
-    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
+    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 600)
     if button returned of userPrompt is equal to "Continue" then
         return "Continue"
     else
@@ -324,7 +324,7 @@ function main() {
     echo "Log: $(date "+%F %T") Checking for currently logged in user." | tee -a "$logPath"
     if ! login_Check;
     then
-        echo "Log: $(date "+%F %T")Exiting for invalid user logged in." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting for invalid user logged in." | tee -a "$logPath"
         exitError
     fi
 
@@ -334,7 +334,7 @@ function main() {
     echo "Log: $(date "+%F %T") Checking for temporary account." | tee -a "$logPath"
     if ! account_Check "$tempAccount";
     then
-        echo "Log: $(date "+%F %T")Temporary account does not exist, exiting." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Temporary account does not exist, exiting." | tee -a "$logPath"
         exitError
     fi
 
@@ -379,7 +379,7 @@ function main() {
     echo "Log: $(date "+%F %T") Checking for \"$managementAccount\" to be an admin." | tee -a "$logPath"
     if ! admin_Check "$managementAccount";
     then
-        echo "Log: $(date "+%F %T")Management account is not an admin, attempting to add to admin group." | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Management account is not an admin, attempting to add to admin group." | tee -a "$logPath"
         if ! addAccount_AdminGroup "$managementAccount" "$tempAccount" "$tempAccountPassword";
         then
             /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." as critical buttons {"OK"} default button "OK" giving up after 900'
