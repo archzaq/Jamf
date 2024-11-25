@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 10-29-24  ###
-### Updated: 11-7-24   ###
-### Version: 1.1       ###
+### Updated: 11-24-24  ###
+### Version: 1.2       ###
 ##########################
 
 managementAccount="$4"
@@ -235,13 +235,13 @@ function check_Ownership() {
 
 # Dialog box to inform user of the overall process taking place
 function user_Prompt() {
-    if [[ $promptCounter -ge 10 ]];
+    if [[ $promptCounter -ge 20 ]];
     then
-        echo "Log: $(date "+%F %T") Prompted ten times with no response, exiting." | tee "$logPath"
+        echo "Log: $(date "+%F %T") Prompted twenty times with no response, exiting." | tee "$logPath"
         return 1
     fi
     userPrompt=$(osascript <<OOP
-    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 600)
+    set userPrompt to (display dialog "You are about to receive CyberArk, a SLU-standard security application.\n\nYou will be prompted for your password before the installation may begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 300)
     if button returned of userPrompt is equal to "Continue" then
         return "Continue"
     else
