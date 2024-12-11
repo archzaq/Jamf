@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
-### Updated: 12-4-24   ###
-### Version: 2.1       ###
+### Updated: 12-9-24   ###
+### Version: 2.2       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -131,7 +131,7 @@ function lab_Prompt(){
     echo "Log: $(date "+%F %T") User chose \"Lab Device\"." | tee -a "$logPath"
     labList=$(osascript <<YOO
         set dropdownResult to choose from list \
-        {"216 - Des Peres", "103 - Macelwane", "2104 - Morrissey", "202 - Xavier", "207 - Xavier", "220 - Xavier", "236 - Xavier"}\
+        {"216 - Des Peres", "2104 - Morrissey", "202 - Xavier", "207 - Xavier", "220 - Xavier", "236 - Xavier"}\
         with title "$dialogTitle" with prompt "Please choose the Lab in which this device will be located:"
         return dropdownResult
 YOO
@@ -148,14 +148,6 @@ YOO
     then
         labName="DP-${labPrefix}-$serialShort"
         echo "Log: $(date "+%F %T") User chose \"Des Peres lab $labPrefix\"." | tee -a "$logPath"
-        echo "Log: $(date "+%F %T") Renaming device to \"$labName\"." | tee -a "$logPath"
-        rename_Device "$labName"
-        exit 0
-   # Name appropriately for Macelwane
-    elif [[ "$lab" == *"Macelwane"* ]];
-    then
-        labName="MWH-${labPrefix}-$serialShort"
-        echo "Log: $(date "+%F %T") User chose \"Macelwane lab $labPrefix\"." | tee -a "$logPath"
         echo "Log: $(date "+%F %T") Renaming device to \"$labName\"." | tee -a "$logPath"
         rename_Device "$labName"
         exit 0
