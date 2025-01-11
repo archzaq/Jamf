@@ -8,7 +8,7 @@
 ##########################
 
 readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
-readonly logPath='/var/log/softwareUpdate.log'
+readonly logPath='/var/log/softwareUpdate_Notification.log'
 readonly iconPath='/usr/local/jamfconnect/SLU.icns'
 readonly dialogTitle='SLU ITS: OS Update'
 readonly currentVersion="$(sw_vers --productVersion)"
