@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-9-25    ###
-### Updated: 1-9-25    ###
-### Version: 1.0       ###
+### Updated: 1-10-25   ###
+### Version: 1.1       ###
 ##########################
 
 readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -46,7 +46,7 @@ function login_Check() {
     fi
 }
 
-# Inform the user of how many updates they currently have with $cleanUpdateList
+# Tell the user to check for updates
 function prompt_User() {
     local userPrompt=$(/usr/bin/osascript <<OOP
     set dialogResult to (display dialog "Check for updates?" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
