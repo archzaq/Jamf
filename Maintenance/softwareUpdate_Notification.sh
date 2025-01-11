@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 1-9-25    ###
 ### Updated: 1-10-25   ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -91,8 +91,10 @@ function main() {
         exit 1
     fi
 
+    echo "Log: $(date "+%F %T") Opening Software Update in System Settings/Preferences." | tee -a "$logPath"
     open "x-apple.systempreferences:com.apple.preferences.softwareupdate"
 
+    echo "Log: $(date "+%F %T") Exiting." | tee -a "$logPath"
     exit 0
 }
 
