@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-9-25    ###
-### Updated: 1-10-25   ###
-### Version: 1.2       ###
+### Updated: 1-11-25   ###
+### Version: 1.3       ###
 ##########################
 
 readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -49,12 +49,12 @@ function login_Check() {
 # Tell the user to check for updates
 function prompt_User() {
     local userPrompt=$(/usr/bin/osascript <<OOP
-    set dialogResult to (display dialog "Check for updates?" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
-    if button returned of dialogResult is equal to "Check for Updates" then
-        return "Check for Updates"
-    else
-        return "timeout"
-    end if
+        set dialogResult to (display dialog "Check for updates?\n\nCurrent macOS Version: $currentVersion" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
+        if button returned of dialogResult is equal to "Check for Updates" then
+            return "Check for Updates"
+        else
+            return "timeout"
+        end if
 OOP
     )
     if [ -z "$userPrompt" ];
