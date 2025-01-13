@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
-### Updated: 12-9-24   ###
-### Version: 2.2       ###
+### Updated: 1-13-25   ###
+### Version: 2.3       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -85,12 +85,12 @@ function department_Prompt() {
         "EAS - Earth and Atmospheric Science", "EM - Enrollment Management", "ENG - English",\
         "EU - Clinical Skill", "EVT - Event Services", "FAC - Facilities",\
         "GC - Office of General Counsel", "HIS - History", "HR - Human Resources",\
-        "IPE - Interprofessional Education Program", "IM-GI - GI-Research", "INTO - INTO_SLU",\
+        "IPE - Interprofessional Education Program", "IM - Internal Medicine", "IM-GI - GI-Research", "INTO - INTO_SLU",\
         "ITS - Information Technology Services", "Lab Device", "LIB - Libraries", "LAW - School of Law",\
         "MAR - Marketing & Communications", "MED - Medical School", "MM - Mission & Ministry",\
         "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
         "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art",\
-        "PAR - Parks College", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
+        "PATH - Pathology", "PAR - Parks College", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
         "PHYS - Physics", "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
         "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
         "SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education",\
