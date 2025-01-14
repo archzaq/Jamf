@@ -92,7 +92,7 @@ function prompt_User() {
     while [[ $retries -le $MAX_RETRIES ]];
     do
         local userPrompt=$(/usr/bin/osascript <<OOP
-            set dialogResult to (display dialog "$phrase" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 9)
+            set dialogResult to (display dialog "$phrase" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
             if button returned of dialogResult is equal to "Check for Updates" then
                 return "Check for Updates"
             else
@@ -114,7 +114,7 @@ OOP
         fi
     done
 
-    echo "Log: $(date "+%F %T") Time out maximum reached, exiting." | tee -a "$logPath"
+    echo "Log: $(date "+%F %T") Time out maximum reached." | tee -a "$logPath"
     return 1
 }
 
