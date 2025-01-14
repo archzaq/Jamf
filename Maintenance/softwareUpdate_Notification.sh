@@ -83,12 +83,13 @@ function phrase_Choice() {
     
     echo "Log: $(date "+%F %T") Dialog phrase chosen for macOS $majorVersion." | tee -a "$logPath"
 }
+
 # Tell the user to check for updates
 function prompt_User() {
-    local retries=0
+    local retries=1
     local MAX_RETRIES=30
     phrase_Choice
-    while [[ $retries -lt $MAX_RETRIES ]];
+    while [[ $retries -le $MAX_RETRIES ]];
     do
         local userPrompt=$(/usr/bin/osascript <<OOP
             set dialogResult to (display dialog "$phrase" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 9)
@@ -105,8 +106,8 @@ OOP
             return 1
         elif [[ "$userPrompt" == "timeout" ]];
         then
-            ((retries++))
             echo "Log: $(date "+%F %T") Timed out, reprompting ($retries/$MAX_RETRIES)." | tee -a "$logPath"
+            ((retries++))
         else
             echo "Log: $(date "+%F %T") Dialog for informing the user completed, continuing." | tee -a "$logPath"
             return 0
