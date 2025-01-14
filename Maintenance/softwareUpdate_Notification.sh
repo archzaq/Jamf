@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-9-25    ###
-### Updated: 1-11-25   ###
-### Version: 1.3       ###
+### Updated: 1-12-25   ###
+### Version: 1.4       ###
 ##########################
 
 readonly currentUser="$(/usr/bin/defaults read /Library/Preferences/com.apple.loginwindow lastUserName)"
@@ -46,10 +46,47 @@ function login_Check() {
     fi
 }
 
+# Call endoflife.date API to get latest macOS versions
+function latest_macOS_Version() {
+    majorVersion="${currentVersion%%.*}"
+    
+    apiJSON="$(curl --request GET \
+        --url https://endoflife.date/api/macOS.json \
+        --header 'Accept: application/json')"
+    
+    latestVersion=$(echo "$apiJSON" | jq -r ".[] | select(.cycle==\"$majorVersion\") | .latest")
+    
+    # Compare versions
+    if [[ "$(printf '%s\n' "$currentVersion" "$latestVersion" | sort -V | head -n1)" == "$currentVersion" && "$currentVersion" != "$latestVersion" ]];
+    then
+        echo "Log: $(date "+%F %T") Update needed: Current version ($currentVersion) is older than latest version ($latestVersion)" | tee "$logPath"
+        return 0
+    else
+        echo "Log: $(date "+%F %T") No update needed: Current version ($currentVersion) is up to date" | tee "$logPath"
+        return 1
+    fi
+}
+
+function phrase_Choice() {
+    if [[ $majorVersion == 15 ]];
+    then
+        phrase="Your Mac is running an outdated version of macOS and requires an immediate update.\n\nCurrent macOS Version: $currentVersion\n\nLatest macOS Version: $latestVersion"
+    elif [[ $majorVersion == 14 ]];
+    then
+        phrase=""
+    elif [[ $majorVersion == 13 ]];
+    then
+        phrase=""
+    else
+        phrase=""
+    fi
+}
+
 # Tell the user to check for updates
 function prompt_User() {
+    phrase_Choice
     local userPrompt=$(/usr/bin/osascript <<OOP
-        set dialogResult to (display dialog "Check for updates?\n\nCurrent macOS Version: $currentVersion" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
+        set dialogResult to (display dialog "$phrase" buttons {"Cancel", "Check for Updates"} default button "Cancel" with icon POSIX file "$iconPath" with title "$dialogTitle" giving up after 900)
         if button returned of dialogResult is equal to "Check for Updates" then
             return "Check for Updates"
         else
@@ -85,6 +122,12 @@ function main() {
         exit 1
     fi
 
+    if ! latest_macOS_Version;
+    then
+        echo "Log: $(date "+%F %T") Exiting for no updates available." | tee -a "$logPath"
+        exit 1
+    fi
+
     if ! prompt_User;
     then
         echo "Log: $(date "+%F %T") Exiting at user prompt." | tee -a "$logPath"
@@ -99,3 +142,4 @@ function main() {
 }
 
 main
+
