@@ -18,6 +18,7 @@ readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resour
 readonly finderIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FinderIcon.icns'
 quickSearch_Activated=0
 
+# Applescript - Ask user for search filter
 function first_Dialog() {
     while true;
     do
@@ -56,6 +57,7 @@ OOP
     done
 }
 
+# Applescript - Ask user for search location
 function dropdown_Prompt() {
     while true;
     do
@@ -89,7 +91,7 @@ OOP
     done
 }
 
-# Applescript - Choose Folder dialog
+# Applescript - Ask user for custom search location
 function customSearch_FolderChoice() {
     while true;
     do
@@ -122,6 +124,7 @@ OOP
     done
 }
 
+# Seach the users home folder for the search filter, excluding library
 function quick_Search() {
     if [[ -d "$homePath" ]];
     then
@@ -135,6 +138,7 @@ function quick_Search() {
     fi
 }
 
+# Search a custom path folder for the search filter
 function custom_Search() {
     local path="$1"
     if [[ -d "$path" ]];
@@ -149,6 +153,7 @@ function custom_Search() {
     fi
 }
 
+# Search within specified file types for the search filter, excluding library for a quick search 
 function within_Files() {
     local path="$1"
     if [[ -d "$path" ]];
@@ -168,6 +173,7 @@ function within_Files() {
     fi
 }
 
+# Check the script is ran with admin priviliges
 function sudo_Check() {
     if [ $(id -u) -ne 0 ];
     then
@@ -180,7 +186,7 @@ function main() {
     sudo_Check
     if [ ! -d "$iconPath" ];
     then
-        echo "Log: $(date "+%F %T") Missing icons for Applescript prompts, exiting" | tee "$logPath"
+        echo "Log: $(date "+%F %T") Missing icon for Applescript prompt, exiting" | tee "$logPath"
         exit 1
     fi
 
