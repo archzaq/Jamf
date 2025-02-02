@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
-### Updated: 2-1-25    ###
-### Version: 1.2       ###
+### Updated: 2-2-25    ###
+### Version: 1.3       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -15,8 +15,21 @@ readonly foundFilesPath="${homePath}/Desktop/${dateAtStart}_fileSearch.log"
 readonly logPath='/var/log/fileSearch.log'
 readonly dialogTitle='File Search'
 readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/'
-readonly finderIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FinderIcon.icns'
+readonly finderIconPath="${iconPath}/FinderIcon.icns"
 quickSearch_Activated=0
+
+# To help exit nicely
+cleanup() {
+    local exit_code=$?
+    echo "Log: $(date "+%F %T") Script interrupted or terminated. Cleaning up..." | tee -a "$logPath"
+    if [[ -f "$foundFilesPath" ]];
+    then
+        echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
+    fi
+    
+    echo "Log: $(date "+%F %T") Cleanup complete. Exiting with code $exit_code" | tee -a "$logPath"
+    exit $exit_code
+}
 
 # Applescript - Ask user for search filter
 function first_Dialog() {
@@ -175,7 +188,7 @@ function within_Files() {
 
 # Check the script is ran with admin priviliges
 function sudo_Check() {
-    if [ $(id -u) -ne 0 ];
+    if [ "$(id -u)" -ne 0 ];
     then
         echo "Please run this script as root or using sudo!"
         exit 1
@@ -192,8 +205,7 @@ function main() {
 
     echo "Log: $(date "+%F %T") Beginning File Search log" | tee "$logPath"
     
-    local exitPlease=0
-    while [ $exitPlease -eq 0 ];
+    while true;
     do
         echo "Log: $(date "+%F %T") Displaying first dialog" | tee -a "$logPath"
         if ! first_Dialog;
@@ -232,7 +244,6 @@ function main() {
                             exit 1
                         fi
                         scanComplete=1
-                        exitPlease=1
                         ;;
                         
                     'Home Scan -'*)
@@ -247,7 +258,6 @@ function main() {
                             exit 1
                         fi
                         scanComplete=1
-                        exitPlease=1
                         ;;
                         
                     'Deep Scan - Entire Drive')
@@ -262,7 +272,6 @@ function main() {
                             exit 1
                         fi
                         scanComplete=1
-                        exitPlease=1
                         ;;
                         
                     'Custom Scan')
@@ -282,7 +291,6 @@ function main() {
                                 exit 1
                             fi
                             scanComplete=1
-                            exitPlease=1
                         fi
                         ;;
                 esac
@@ -298,6 +306,10 @@ function main() {
         fi
     done
 }
+
+# Exit nicely
+trap cleanup EXIT
+trap 'exit' INT TERM HUP
 
 main
 
