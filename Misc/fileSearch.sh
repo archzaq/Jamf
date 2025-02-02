@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
 ### Updated: 2-1-25    ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -61,7 +61,7 @@ function dropdown_Prompt() {
     do
         dropdownPrompt=$(/usr/bin/osascript <<OOP
         set options to {"Quick Scan", "Home Scan - $homePath", "Deep Scan - Entire Drive", "Custom Scan"}
-        set userChoice to (choose from list options with prompt "Please choose the depth for which to search:" default items "Quick Scan" with icon POSIX file "$folderIconPath" with title "$dialogTitle")
+        set userChoice to (choose from list options with prompt "Please choose the depth for which to search:" default items "Quick Scan" with title "$dialogTitle")
         if userChoice is false then
             return "cancelled"
         else if userChoice is {} then
