@@ -92,7 +92,7 @@ function customSearch_FolderChoice() {
     do
         customDialogPath=$(/usr/bin/osascript <<OOP
         try
-            set selectedFolder to (choose folder with prompt "Select a folder to search:")
+            set selectedFolder to (choose folder with prompt "Select a folder to search within:")
             set folderPath to POSIX path of selectedFolder
             return folderPath
         on error
