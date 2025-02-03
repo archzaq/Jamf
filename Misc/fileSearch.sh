@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
-### Updated: 2-2-25    ###
-### Version: 1.3       ###
+### Updated: 2-3-25    ###
+### Version: 1.4       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -17,19 +17,6 @@ readonly dialogTitle='File Search'
 readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/'
 readonly finderIconPath="${iconPath}/FinderIcon.icns"
 quickSearch_Activated=0
-
-# To help exit nicely
-cleanup() {
-    local exit_code=$?
-    echo "Log: $(date "+%F %T") Script interrupted or terminated. Cleaning up..." | tee -a "$logPath"
-    if [[ -f "$foundFilesPath" ]];
-    then
-        echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
-    fi
-    
-    echo "Log: $(date "+%F %T") Cleanup complete. Exiting with code $exit_code" | tee -a "$logPath"
-    exit $exit_code
-}
 
 # Applescript - Ask user for search filter
 function first_Dialog() {
@@ -52,21 +39,19 @@ function first_Dialog() {
         end try
 OOP
         )
-        if [[ "$firstDialog" == 'cancelled' ]];
-        then
-            echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
-            return 1
-        elif [[ -z "$firstDialog" ]];
-        then
-            echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
-        elif [[ -n "$firstDialog" ]];
-        then
-            echo "Log: $(date "+%F %T") User reponded with: $firstDialog" | tee -a "$logPath"
-            return 0
-        else
-            echo "Log: $(date "+%F %T") Not sure what happened" | tee -a "$logPath"
-            return 1
-        fi
+        case "$firstDialog" in
+            'cancelled')
+                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                return 1
+                ;;
+            '')
+                echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
+                ;;
+            *)
+                echo "Log: $(date "+%F %T") User reponded with: $firstDialog" | tee -a "$logPath"
+                return 0
+                ;;
+        esac
     done
 }
 
@@ -86,21 +71,19 @@ function dropdown_Prompt() {
         end if
 OOP
         )
-        if [[ "$dropdownPrompt" == "cancelled" ]];
-        then
-            echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
-            return 1
-        elif [[ "$dropdownPrompt" == "timeout" ]];
-        then
-            echo "Log: $(date "+%F %T") Timed out, reprompting" | tee -a "$logPath"
-        elif [[ -n "$dropdownPrompt" ]];
-        then
-            echo "Log: $(date "+%F %T") User chose: $dropdownPrompt" | tee -a "$logPath"
-            return 0
-        else
-            echo "Log: $(date "+%F %T") Not sure what happened" | tee -a "$logPath"
-            return 1
-        fi
+        case "$dropdownPrompt" in
+            'cancelled')
+                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                return 1
+                ;;
+            'timeout')
+                echo "Log: $(date "+%F %T") Timed out, reprompting" | tee -a "$logPath"
+                ;;
+            *)
+                echo "Log: $(date "+%F %T") User chose: $dropdownPrompt" | tee -a "$logPath"
+                return 0
+                ;;
+        esac
     done
 }
 
@@ -116,24 +99,21 @@ function customSearch_FolderChoice() {
         on error
             return "cancelled"
         end try
-
 OOP
         )
-        if [[ "$customDialogPath" == "cancelled" ]];
-        then
-            echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
-            return 1
-        elif [[ -z "$customDialogPath" ]];
-        then
-            echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
-        elif [[ -n "$customDialogPath" ]];
-        then
-            echo "Log: $(date "+%F %T") User chose: $customDialogPath" | tee -a "$logPath"
-            return 0
-        else
-            echo "Log: $(date "+%F %T") Not sure what happened" | tee -a "$logPath"
-            return 1
-        fi
+        case "$customDialogPath" in
+            'cancelled')
+                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                return 1
+                ;;
+            '')
+                echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
+                ;;
+            *)
+                echo "Log: $(date "+%F %T") User chose: $customDialogPath" | tee -a "$logPath"
+                return 0
+                ;;
+        esac
     done
 }
 
@@ -192,6 +172,21 @@ function sudo_Check() {
     then
         echo "Please run this script as root or using sudo!"
         exit 1
+    fi
+}
+
+# To help exit nicely
+exit_Nicely() {
+    local exitCode=$?
+    if [ $exitCode -ne 0 ];
+    then
+        echo "Log: $(date "+%F %T") Script interrupted or terminated" | tee -a "$logPath"
+        if [[ -f "$foundFilesPath" ]];
+        then
+            echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
+        fi
+        echo "Log: $(date "+%F %T") Exiting with code $exitCode" | tee -a "$logPath"
+        exit $exitCode
     fi
 }
 
@@ -307,8 +302,8 @@ function main() {
     done
 }
 
-# Exit nicely
-trap cleanup EXIT
+# Just using trap to catch interrupts
+trap exit_Nicely EXIT
 trap 'exit' INT TERM HUP
 
 main
