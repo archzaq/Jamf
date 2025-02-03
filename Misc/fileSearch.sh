@@ -12,10 +12,10 @@ readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | a
 readonly homePath="/Users/${userAccount}"
 readonly cloudPath="${homePath}/Library/CloudStorage"
 readonly foundFilesPath="${homePath}/Desktop/${dateAtStart}_fileSearch.log"
-readonly logPath='/var/log/fileSearch.log'
-readonly dialogTitle='File Search'
 readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/'
 readonly finderIconPath="${iconPath}/FinderIcon.icns"
+readonly dialogTitle='File Search'
+readonly logPath='/var/log/fileSearch.log'
 quickSearch_Activated=0
 
 # Applescript - Ask user for search filter
@@ -28,7 +28,6 @@ function first_Dialog() {
             set dialogResult to display dialog prompt buttons {"Cancel", "Continue"} default answer "" default button "Continue" with title "$dialogTitle" with icon POSIX file "$finderIconPath" giving up after 900
             set buttonChoice to button returned of dialogResult
             set typedText to text returned of dialogResult
-
             if buttonChoice is equal to "Continue" then
                 return typedText
             else
@@ -185,8 +184,10 @@ exit_Nicely() {
         then
             echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
         fi
-        echo "Log: $(date "+%F %T") Exiting with code $exitCode" | tee -a "$logPath"
+        echo "Log: $(date "+%F %T") Exiting with code: $exitCode" | tee -a "$logPath"
         exit $exitCode
+    else
+        echo "Log: $(date "+%F %T") Exiting successfully" | tee -a "$logPath"
     fi
 }
 
@@ -199,7 +200,6 @@ function main() {
     fi
 
     echo "Log: $(date "+%F %T") Beginning File Search log" | tee "$logPath"
-    
     while true;
     do
         echo "Log: $(date "+%F %T") Displaying first dialog" | tee -a "$logPath"
@@ -295,7 +295,6 @@ function main() {
         if [ $scanComplete -eq 1 ];
         then
             echo "Log: $(date "+%F %T") Found file logs can be found at $foundFilesPath" | tee -a "$logPath"
-            echo "Log: $(date "+%F %T") Exiting successfully" | tee -a "$logPath"
             open "$foundFilesPath"
             exit 0
         fi
