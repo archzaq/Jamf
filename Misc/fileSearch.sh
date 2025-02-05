@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
-### Updated: 2-3-25    ###
-### Version: 1.4       ###
+### Updated: 2-4-25    ###
+### Version: 1.5       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -16,7 +16,6 @@ readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resour
 readonly finderIconPath="${iconPath}/FinderIcon.icns"
 readonly dialogTitle='File Search'
 readonly logPath='/var/log/fileSearch.log'
-quickSearch_Activated=0
 
 # Applescript - Ask user for search filter
 function first_Dialog() {
@@ -25,7 +24,8 @@ function first_Dialog() {
         firstDialog=$(/usr/bin/osascript <<OOP
         try
             set prompt to "Welcome to File Search!\n\nPlease enter the text you would like to search for:"
-            set dialogResult to display dialog prompt buttons {"Cancel", "Continue"} default answer "" default button "Continue" with title "$dialogTitle" with icon POSIX file "$finderIconPath" giving up after 900
+            set dialogResult to display dialog prompt buttons {"Cancel", "Continue"} default answer "" default button "Continue" \
+                with title "$dialogTitle" with icon POSIX file "$finderIconPath" giving up after 900
             set buttonChoice to button returned of dialogResult
             set typedText to text returned of dialogResult
             if buttonChoice is equal to "Continue" then
@@ -116,28 +116,19 @@ OOP
     done
 }
 
-# Seach the users home folder for the search filter, excluding library
-function quick_Search() {
-    if [[ -d "$homePath" ]];
-    then
-        echo "Log: $(date "+%F %T") Beginning search at $homePath for: $firstDialog" | tee -a "$logPath"
-        echo "Log: $(date "+%F %T") Searching for files at $homePath for: $firstDialog" >> "$foundFilesPath"
-        find "$homePath" -path "$homePath/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
-        echo "Log: $(date "+%F %T") Completed search at $homePath" | tee -a "$logPath"
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Search a custom path folder for the search filter
+# Search a custom path folder for the search filter, exlcuding library for a quick search
 function custom_Search() {
     local path="$1"
     if [[ -d "$path" ]];
     then
         echo "Log: $(date "+%F %T") Beginning search at $path for: $firstDialog" | tee -a "$logPath"
         echo "Log: $(date "+%F %T") Searching for files at $path for: $firstDialog" >> "$foundFilesPath"
-        find "$path" -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
+        if [ "$quickSearchActivated" -eq 0 ];
+        then
+            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
+        else
+            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
+        fi
         echo "Log: $(date "+%F %T") Completed search at $path" | tee -a "$logPath"
         return 0
     else
@@ -152,11 +143,15 @@ function within_Files() {
     then
         echo "Log: $(date "+%F %T") Beginning search within files at $path for: $firstDialog" | tee -a "$logPath"
         echo "Log: $(date "+%F %T") Searching within files at $path for: $firstDialog" >> "$foundFilesPath"
-        if [ "$quickSearch_Activated" -eq 0 ];
+        if [ "$quickSearchActivated" -eq 0 ];
         then
-            find "$path" -type f \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
+            find "$path" -type f \
+                \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
         else
-            find "$path" -path "/Users/$userAccount/Library" -prune -o -type f \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
+            find "$path" -path "/Users/$userAccount/Library" -prune -o -type f \
+                \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
         fi
         echo "Log: $(date "+%F %T") Completed search within files at $path" | tee -a "$logPath"
         return 0
@@ -183,10 +178,12 @@ exit_Nicely() {
         if [[ -f "$foundFilesPath" ]];
         then
             echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
+            open "$foundFilesPath"
         fi
         echo "Log: $(date "+%F %T") Exiting with code: $exitCode" | tee -a "$logPath"
         exit $exitCode
     else
+        open "$foundFilesPath"
         echo "Log: $(date "+%F %T") Exiting successfully" | tee -a "$logPath"
     fi
 }
@@ -213,6 +210,7 @@ function main() {
         local returnToFirstDialog=0
         while [ $scanComplete -eq 0 ] && [ $returnToFirstDialog -eq 0 ];
         do
+            quickSearchActivated=0
             echo "Log: $(date "+%F %T") Displaying dropdown prompt" | tee -a "$logPath"
             if ! dropdown_Prompt;
             then
@@ -226,12 +224,11 @@ function main() {
                 
                 case "$dropdownPrompt" in
                     'Quick Scan')
-                        if ! quick_Search;
+                        quickSearchActivated=1
+                        if ! custom_Search "$homePath";
                         then
                             echo "Log: $(date "+%F %T") Exiting at home search for invalid path" | tee -a "$logPath"
                             exit 1
-                        else
-                            quickSearch_Activated=1
                         fi
                         if ! within_Files "$homePath";
                         then
@@ -295,7 +292,6 @@ function main() {
         if [ $scanComplete -eq 1 ];
         then
             echo "Log: $(date "+%F %T") Found file logs can be found at $foundFilesPath" | tee -a "$logPath"
-            open "$foundFilesPath"
             exit 0
         fi
     done
