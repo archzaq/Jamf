@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
-### Updated: 1-13-25   ###
-### Version: 2.3       ###
+### Updated: 2-7-25    ###
+### Version: 2.4       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -96,7 +96,7 @@ function department_Prompt() {
         "SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education",\
         "SON - School of Nursing", "SPH - School of Public Health",\
         "SPS - School of Professional Studies", "SDEV - Student Development", "SW - Social Work",\
-        "THE - Theological Studies", "WMS - Women’s Studies Program"}\
+        "TGI - Taylor Geospacial Institute", "THE - Theological Studies", "WMS - Women’s Studies Program"}\
         with title "SLU ITS: Device Rename" with prompt "Please choose your department:"
         return dropdownResult
 YOO
