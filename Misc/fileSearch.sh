@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
-### Updated: 2-4-25    ###
-### Version: 1.5       ###
+### Updated: 2-25-25   ###
+### Version: 1.6       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -17,7 +17,7 @@ readonly finderIconPath="${iconPath}/FinderIcon.icns"
 readonly dialogTitle='File Search'
 readonly logPath='/var/log/fileSearch.log'
 
-# Applescript - Ask user for search filter
+# AppleScript - Ask user for search filter
 function first_Dialog() {
     while true;
     do
@@ -44,17 +44,17 @@ OOP
                 return 1
                 ;;
             '')
-                echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
+                echo "Log: $(date "+%F %T") No response, re-prompting" | tee -a "$logPath"
                 ;;
             *)
-                echo "Log: $(date "+%F %T") User reponded with: $firstDialog" | tee -a "$logPath"
+                echo "Log: $(date "+%F %T") User responded with: $firstDialog" | tee -a "$logPath"
                 return 0
                 ;;
         esac
     done
 }
 
-# Applescript - Ask user for search location
+# AppleScript - Ask user for search location
 function dropdown_Prompt() {
     while true;
     do
@@ -76,7 +76,7 @@ OOP
                 return 1
                 ;;
             'timeout')
-                echo "Log: $(date "+%F %T") Timed out, reprompting" | tee -a "$logPath"
+                echo "Log: $(date "+%F %T") Timed out, re-prompting" | tee -a "$logPath"
                 ;;
             *)
                 echo "Log: $(date "+%F %T") User chose: $dropdownPrompt" | tee -a "$logPath"
@@ -86,7 +86,7 @@ OOP
     done
 }
 
-# Applescript - Ask user for custom search location
+# AppleScript - Ask user for custom search location
 function customSearch_FolderChoice() {
     while true;
     do
@@ -106,7 +106,7 @@ OOP
                 return 1
                 ;;
             '')
-                echo "Log: $(date "+%F %T") No response, reprompting" | tee -a "$logPath"
+                echo "Log: $(date "+%F %T") No response, re-prompting" | tee -a "$logPath"
                 ;;
             *)
                 echo "Log: $(date "+%F %T") User chose: $customDialogPath" | tee -a "$logPath"
@@ -116,7 +116,7 @@ OOP
     done
 }
 
-# Search a custom path folder for the search filter, exlcuding library for a quick search
+# Search a custom path folder for the search filter, excluding library for a quick search
 function custom_Search() {
     local path="$1"
     if [[ -d "$path" ]];
@@ -160,7 +160,7 @@ function within_Files() {
     fi
 }
 
-# Check the script is ran with admin priviliges
+# Check the script is ran with admin privileges
 function sudo_Check() {
     if [ "$(id -u)" -ne 0 ];
     then
@@ -170,7 +170,7 @@ function sudo_Check() {
 }
 
 # To help exit nicely
-exit_Nicely() {
+function exit_Nicely() {
     local exitCode=$?
     if [ $exitCode -ne 0 ];
     then
@@ -192,7 +192,7 @@ function main() {
     sudo_Check
     if [ ! -d "$iconPath" ];
     then
-        echo "Log: $(date "+%F %T") Missing icon for Applescript prompt, exiting" | tee "$logPath"
+        echo "Log: $(date "+%F %T") Missing icon for AppleScript prompt, exiting" | tee "$logPath"
         exit 1
     fi
 
@@ -211,7 +211,7 @@ function main() {
         while [ $scanComplete -eq 0 ] && [ $returnToFirstDialog -eq 0 ];
         do
             quickSearchActivated=0
-            echo "Log: $(date "+%F %T") Displaying dropdown prompt" | tee -a "$logPath"
+            echo "Log: $(date "+%F %T") Displaying drop-down prompt" | tee -a "$logPath"
             if ! dropdown_Prompt;
             then
                 echo "Log: $(date "+%F %T") Going back to first dialog" | tee -a "$logPath"
@@ -270,7 +270,7 @@ function main() {
                         echo "Log: $(date "+%F %T") Displaying custom search dialog" | tee -a "$logPath"
                         if ! customSearch_FolderChoice;
                         then
-                            echo "Log: $(date "+%F %T") Going back to dropdown prompt" | tee -a "$logPath"
+                            echo "Log: $(date "+%F %T") Going back to drop-down prompt" | tee -a "$logPath"
                         else
                             if ! custom_Search "$customDialogPath";
                             then
