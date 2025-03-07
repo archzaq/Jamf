@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 3-3-25    ###
 ### Updated: 3-7-25    ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
