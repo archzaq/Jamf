@@ -15,7 +15,6 @@ readonly backupTarLocation="${backupFolderLocation}/networkFiles.tgz"
 readonly systemConfigurationFolder='/Library/Preferences/SystemConfiguration'
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ProfileBackgroundColor.icns'
-effectiveIconPath="$defaultIconPath"
 readonly dialogTitle='SLU ITS: Network Reset'
 readonly logPath='/var/log/networkReset.log'
 readonly networkFilesArray=( 
@@ -30,6 +29,7 @@ readonly networkFilesArray=(
 
 # Check for SLU icon file, AppleScript dialog boxes will error without it
 function icon_Check() {
+    effectiveIconPath="$defaultIconPath"
     if [[ ! -f "$effectiveIconPath" ]];
     then
         log_Message "No SLU icon found."
