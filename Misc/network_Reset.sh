@@ -13,7 +13,9 @@ readonly backupFolderLocation="${userHomeFolder}/.SLU"
 readonly backupTempFolder="${backupFolderLocation}/networkFiles"
 readonly backupTarLocation="${backupFolderLocation}/networkFiles.tgz"
 readonly systemConfigurationFolder='/Library/Preferences/SystemConfiguration'
-readonly iconPath='/usr/local/jamfconnect/SLU.icns'
+readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
+readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ProfileBackgroundColor.icns'
+effectiveIconPath="$defaultIconPath"
 readonly dialogTitle='SLU ITS: Network Reset'
 readonly logPath='/var/log/networkReset.log'
 readonly networkFilesArray=( 
@@ -28,17 +30,28 @@ readonly networkFilesArray=(
 
 # Check for SLU icon file, AppleScript dialog boxes will error without it
 function icon_Check() {
-    if [[ ! -f "$iconPath" ]];
+    if [[ ! -f "$effectiveIconPath" ]];
     then
-        log_Message "No SLU icon found, attempting install."
-        /usr/local/bin/jamf policy -event SLUFonts
-        if [[ ! -f "$iconPath" ]];
+        log_Message "No SLU icon found."
+        if [[ -f '/usr/local/bin/jamf' ]];
         then
-            log_Message "No SLU icon found, exiting."
-            return 1
+            log_Message "Attempting icon install via Jamf."
+            /usr/local/bin/jamf policy -event SLUFonts
+        else
+            log_Message "No Jamf binary found."
+        fi
+        if [[ ! -f "$effectiveIconPath" ]];
+        then
+            if [[ -f "$genericIconPath" ]];
+            then
+                log_Message "Using generic icon."
+                effectiveIconPath="$genericIconPath"
+            else
+                log_Message "No generic icon available."
+                return 1
+            fi
         fi
     fi
-    log_Message "SLU icon found."
     return 0
 }
 
@@ -68,7 +81,7 @@ function binary_Dialog() {
         binDialog=$(/usr/bin/osascript <<OOP
         try
             set promptString to "$promptString"
-            set iconPath to "$iconPath"
+            set iconPath to "$effectiveIconPath"
             set dialogTitle to "$dialogTitle"
             set dialogResult to display dialog promptString buttons {"Cancel", "Continue"} default button "Continue" with icon POSIX file iconPath with title dialogTitle giving up after 900
             set buttonChoice to button returned of dialogResult
@@ -138,7 +151,7 @@ function inform_Dialog() {
     do
         informDialog=$(/usr/bin/osascript <<OOP
         set promptString to "$promptString"
-        set iconPath to "$iconPath"
+        set iconPath to "$effectiveIconPath"
         set dialogTitle to "$dialogTitle"
         set dialogResult to display dialog promptString buttons {"OK"} default button "OK" with icon POSIX file iconPath with title dialogTitle giving up after 900
         set buttonChoice to button returned of dialogResult
