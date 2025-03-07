@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 3-3-25    ###
-### Updated: 3-6-25    ###
-### Version: 1.0       ###
+### Updated: 3-7-25    ###
+### Version: 1.1       ###
 ##########################
 
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
@@ -44,19 +44,21 @@ function icon_Check() {
 
 # Check if someone is logged into the device
 function login_Check() {
-    if [[ "$userAccount" == 'root' ]];
-    then
-        log_Message "\"root\" currently logged in."
-        return 1
-    elif [[ "$userAccount" == 'loginwindow' ]] || [[ -z "$userAccount" ]];
-    then
-        log_Message "No one logged in."
-        return 1
-    else
-        log_Message "\"$userAccount\" currently logged in."
-        return 0
-    fi
+    case "$userAccount" in
+        'root')
+            log_Message "\"root\" currently logged in."
+            return 1
+            ;;
+        'loginwindow' | '')
+            log_Message "No one logged in."
+            return 1
+            ;;
+        *)
+            log_Message "\"$userAccount\" currently logged in."
+            return 0
+    esac
 }
+
 # AppleScript - Informing the user and giving them two choices
 function binary_Dialog() {
     local promptString="$1"
@@ -123,7 +125,9 @@ function backup_Network_Files() {
         /bin/rm -r "$backupTempFolder"
     else
         log_Message "tar command failed."
+        return 1
     fi
+    return 0
 }
 
 # AppleScript - Informing the user of what took place
@@ -186,15 +190,20 @@ function main() {
         exit 0
     fi
 
+    log_Message "Beginning file backup."
     if [[ ! -d "$backupTempFolder" ]];
     then
         log_Message "Creating backup folder at $backupFolderLocation"
-        su $userAccount -c "mkdir -p $backupTempFolder"
+        su "$userAccount" -c "mkdir -p $backupTempFolder"
     else
         log_Message "Backup folder already exists."
     fi
 
-    backup_Network_Files
+    if ! backup_Network_Files;
+    then
+        log_Message "Exiting at file backup."
+        exit 1
+    fi
 
     log_Message "Displaying last dialog."
     if ! inform_Dialog "Process Completed!\n\nPlease restart the computer to reconfigure your internet and wireless functionality.";
@@ -202,6 +211,7 @@ function main() {
         log_Message "Exiting at last dialog."
         exit 0
     fi
+
     log_Message "Exiting!"
     exit 0
 }
