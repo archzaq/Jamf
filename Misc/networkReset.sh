@@ -108,7 +108,7 @@ function backup_Network_Files() {
         if [[ -f "$fullFilePath" ]];
         then
             log_Message "Backing up $fullFilePath"
-            cp "$fullFilePath" "$backupTempFolder"
+            /bin/cp "$fullFilePath" "$backupTempFolder"
             if [[ $? -eq 0 ]];
             then
                 log_Message "Removing $fullFilePath"
@@ -123,11 +123,11 @@ function backup_Network_Files() {
     then
         log_Message "Backed up network files are located at $backupTarLocation"
         /bin/rm -r "$backupTempFolder"
+        return 0
     else
         log_Message "tar command failed."
         return 1
     fi
-    return 0
 }
 
 # AppleScript - Informing the user of what took place
