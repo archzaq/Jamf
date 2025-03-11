@@ -9,7 +9,6 @@
 
 readonly logPath='/var/log/JamfConnect_Removal.log'
 readonly jamfConnectFilesArray=(
-    "/usr/local/bin/authchanger"
     "/usr/local/lib/pam/pam_saml.so.2"
     "/Library/LaunchAgents/com.jamf.connect.plist"
     "/Library/Managed Preferences/com.jamf.connect.plist"
