@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 7-25-23   ###
 ### Updated: 3-11-25   ###
-### Version: 1.3       ###
+### Version: 1.4       ###
 ##########################
 
 # Locations of Jamf Connect components
