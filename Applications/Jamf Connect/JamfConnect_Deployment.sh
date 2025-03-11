@@ -3,114 +3,239 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 7-25-23   ###
-### Updated: 6-21-24   ###
-### Version: 1.2       ###
+### Updated: 3-11-25   ###
+### Version: 1.3       ###
 ##########################
 
 # Locations of Jamf Connect components
-readonly launch_agent="/Library/LaunchAgents/com.jamf.connect.plist"
-readonly login_image="/usr/local/jamfconnect/login-background.jpeg"
-readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
-readonly jamf_connect_app="/Applications/Jamf Connect.app"
-promptCount=0
+readonly launchAgentLocation="/Library/LaunchAgents/com.jamf.connect.plist"
+readonly loginImageLocation="/usr/local/jamfconnect/login-background.jpeg"
+readonly jamfConnectConfigProfile="/Library/Managed Preferences/com.jamf.connect.login.plist"
+readonly jamfConnectAppLocation="/Applications/Jamf Connect.app"
+readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
+readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
+readonly dialogTitle='SLU ITS: Jamf Connect Install'
+readonly logPath='/var/log/JamfConnect_Deployment.log'
 
-# Dialog box to inform user of the overall process taking place
-function user_Prompt() {
-    userPrompt=$(osascript <<OOP
-        set dialogResult to display dialog "You are about to receive the latest version of Jamf Connect.\n\nYou will be prompted to log out of your device after the install of Jamf Connect has completed.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Continue"} default button "Continue" with title "SLU ITS: Jamf Connect Install" giving up after 900
-        if button returned of dialogResult is equal to "Continue" then
-            return "User selected: Continue"
+# Check for SLU icon file, AppleScript dialog boxes will error without it
+function icon_Check() {
+    effectiveIconPath="$defaultIconPath"
+    if [[ ! -f "$effectiveIconPath" ]];
+    then
+        log_Message "No SLU icon found."
+        if [[ -f '/usr/local/bin/jamf' ]];
+        then
+            log_Message "Attempting icon install via Jamf."
+            /usr/local/bin/jamf policy -event SLUFonts
         else
-            return "Dialog timed out"
-        end if
-OOP
-    )
-    userAnswer=$(echo "$userPrompt")
-    ((promptCount++))
-    if [[ "$userAnswer" == *"Continue"* ]];
-    then
-        echo "Log: User selected \"Continue\" through the first dialog box"
-    elif [ "$promptCount" -le 10 ];
-    then
-        echo "Log: Reprompting user with the first dialog box"
-        user_Prompt
+            log_Message "No Jamf binary found."
+        fi
+        if [[ ! -f "$effectiveIconPath" ]];
+        then
+            if [[ -f "$genericIconPath" ]];
+            then
+                log_Message "Generic icon found."
+                effectiveIconPath="$genericIconPath"
+            else
+                log_Message "Generic icon not found."
+                return 1
+            fi
+        fi
     else
-        echo "Log: User prompted 10 times, exiting..."
-        exit 1
+        log_Message "SLU icon found."
     fi
+    return 0
 }
 
-# Waits until the Jamf Connect pieces are in place, retrying after three minutes then timing out after another three
-function connect_Check(){
-    counter=0
-    repair_trigger=0
-    retry=0
-    until [ -f "$launch_agent" ] && [ -f "$login_image" ] && [ -f "$jamf_connect_plist" ] && [ -d "$jamf_connect_app" ];
+# Check if someone is logged into the device
+function login_Check() {
+    case "$userAccount" in
+        'root')
+            log_Message "\"root\" currently logged in."
+            return 1
+            ;;
+        'loginwindow' | '')
+            log_Message "No one logged in."
+            return 1
+            ;;
+        *)
+            log_Message "\"$userAccount\" currently logged in."
+            return 0
+            ;;
+    esac
+}
+
+# AppleScript - Informing the user and giving them two choices
+function binary_Dialog() {
+    local promptString="$1"
+    local count=1
+    while [ $count -le 10 ];
+    do
+        binDialog=$(/usr/bin/osascript <<OOP
+        try
+            set promptString to "$promptString"
+            set iconPath to "$effectiveIconPath"
+            set dialogTitle to "$dialogTitle"
+            set dialogResult to display dialog promptString buttons {"Cancel", "Continue"} default button "Continue" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            set buttonChoice to button returned of dialogResult
+            if buttonChoice is equal to "Continue" then
+                return buttonChoice
+            else
+                return "timeout"
+            end if
+        on error
+            return "cancelled"
+        end try
+OOP
+        )
+        case "$binDialog" in
+            'cancelled')
+                log_Message "User selected cancel."
+                return 1
+                ;;
+            'timeout')
+                log_Message "No response, re-prompting ($count/10)."
+                ((count++))
+                ;;
+            *)
+                log_Message "User responded with: $binDialog"
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# Waits until the Jamf Connect pieces are in place. First waiting for two minutes, retrying after two minutes, then timing out 
+function JamfConnect_Check(){
+    local counter=0
+    local retry=0
+    until [ -f "$launchAgentLocation" ] && [ -f "$loginImageLocation" ] && [ -f "$jamfConnectConfigProfile" ] && [ -d "$jamfConnectAppLocation" ];
     do
         sleep 1
         ((counter++))
-        if [ $counter -eq 180 ];
+        if [ $counter -eq 120 ];
         then
             ((retry++))
-            if [ $retry -eq 2 ];
+            log_Message "Missing components:"
+            if [ ! -d "$jamfConnectAppLocation" ]; then log_Message " - Jamf Connect application"; fi
+            if [ ! -f "$launchAgentLocation" ]; then log_Message " - LaunchAgent"; fi
+            if [ ! -f "$loginImageLocation" ]; then log_Message " - login image"; fi
+            if [ ! -f "$jamfConnectConfigProfile" ]; then log_Message " - .plist file"; fi
+            if [ $retry -eq 1 ];
             then
-                echo "Log: Process timed out twice, attempting to repair install.."
-                /usr/local/bin/jamf recon
-                repair_trigger=1
+                log_Message "Process timed out, retrying."
+                counter=0
+            elif [ $retry -eq 2 ];
+            then
+                log_Message "Process timed out twice, attempting Jamf Connect repair."
+                /usr/local/bin/jamf policy -event RepairJamfConnect
+                counter=0
             elif [ $retry -eq 3 ];
             then
-                echo "Log: Process timed out three times, exiting..."
-                exit 1
-            fi
-
-            if [ $repair_trigger -eq 0 ];
-            then
-                echo "Log: Process timed out, retrying"
+                log_Message "Process timed out three times, exiting."
+                return 1
             fi
         fi
     done
+    log_Message "All Jamf Connect components installed!"
+    return 0
 }
 
-# Dialog box to prompt the user to log out 
-function device_LogOut(){
-    macLogOut=$(osascript <<OOP
-        set dialogResult to display dialog "The Jamf Connect installation is complete!\n\nPlease log out of your Mac; when you log in again, you will be prompted to enter your Okta credentials.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000." buttons {"Log Out"} default button "Log Out" with title "SLU ITS: Log Out" giving up after 900
-        if button returned of dialogResult is equal to "Log Out" then
-            return "User selected: Log Out"
+# AppleScript - Informing the user of what took place
+function inform_Dialog_LogOut() {
+    local promptString="$1"
+    local count=1
+    while [ $count -le 10 ];
+    do
+        informDialog=$(/usr/bin/osascript <<OOP
+        set promptString to "$promptString"
+        set iconPath to "$effectiveIconPath"
+        set dialogTitle to "$dialogTitle"
+        set dialogResult to display dialog promptString buttons {"Log Out"} default button "Log Out" with icon POSIX file iconPath with title dialogTitle giving up after 900
+        set buttonChoice to button returned of dialogResult
+        if buttonChoice is equal to "Log Out" then
+            return buttonChoice
         else
-            return "Dialog timed out"
+            return "timeout"
         end if
 OOP
-    )
-    /usr/local/bin/authchanger -reset -JamfConnect
-    sleep 1
-    macLogOutAnswer=$(echo "$macLogOut")
-    if [[ $macLogOutAnswer == *"Log Out"* ]];
-    then
-        echo "Log: User selected \"Log Out\". Sending log out command"
-        osascript -e 'tell application "System Events" to log out' &
-        echo "Log: Sent log out command"
-        exit 0
-    else
-        osascript -e 'tell application "System Events" to log out' &
-        exit 0
-    fi
+        )
+        case "$informDialog" in
+            'timeout')
+                log_Message "No response, re-prompting ($count/10)."
+                ((count++))
+                ;;
+            *)
+                log_Message "User responded with: $informDialog"
+                osascript -e 'tell application "System Events" to log out' &
+                log_Message "Sent log out command."
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# Append current status to log file
+function log_Message() {
+    echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
 }
 
 function main(){
-    echo "Log: Informing user of the Jamf Connect installation"
-    user_Prompt
+    echo "Log: $(date "+%F %T") Beginning Jamf Connect Deployment script." | tee "$logPath"
 
-    echo "Log: Running recon"
+    if ! icon_Check;
+    then
+        log_Message "Exiting for no SLU icon."
+        exit 1
+    fi
+    
+    if ! login_Check;
+    then
+        log_Message "Exiting for invalid user logged in."
+        exit 1
+    fi
+
+    log_Message "Displaying first dialog."
+    if ! binary_Dialog "You are about to receive the latest version of Jamf Connect.\n\n\
+You will be prompted to log out of your device after the install of Jamf Connect has completed.\n\n\
+If you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000.";
+    then
+        log_Message "Exiting at first dialog."
+        exit 0
+    fi
+
+    log_Message "Running Jamf Recon."
     /usr/local/bin/jamf recon
-    echo "Log: Recon complete"
+    if [ $? -eq 0 ];
+    then
+        log_Message "Jamf Recon completed."
+    else
+        log_Message "Jamf Recon failed, trying again in 30 seconds."
+        sleep 30
+        /usr/local/bin/jamf recon
+    fi
 
-    echo "Log: Awaiting the alignment of various components"
-    connect_Check
-    echo "Log: Components aligned"
+    log_Message "Checking for Jamf Application, LaunchAgent, login image, and .plist file." 
+    if ! JamfConnect_Check;
+    then
+        log_Message "Exiting at Jamf Connect check."
+        exit 1
+    fi
 
-    echo "Log: Prompting user to log out"
-    device_LogOut
+    log_Message "Prompting user to log out"
+    if ! inform_Dialog_LogOut "The Jamf Connect installation is complete!\n\n\
+Please log out of your Mac; when you log in again, you will be prompted to enter your Okta credentials.\n\n\
+If you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000.";
+    then
+        log_Message "Exiting at log out dialog."
+        exit 1
+    fi
+
+    log_Message "Exiting!"
+    exit 0
 }
 
 main
