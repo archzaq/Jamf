@@ -10,7 +10,7 @@
 # Locations of Jamf Connect components
 readonly launchAgentLocation='/Library/LaunchAgents/com.jamf.connect.plist'
 readonly loginImageLocation='/usr/local/jamfconnect/login-background.jpeg'
-readonly jamfConnectConfigProfile='/Library/Managed Preferences/com.jamf.connect.login.plist'
+readonly jamfConnectMenuConfigProfile='/Library/Managed Preferences/com.jamf.connect.plist'
 readonly jamfConnectAppLocation='/Applications/Jamf Connect.app'
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -113,14 +113,14 @@ function individual_Check(){
     if [ ! -d "$jamfConnectAppLocation" ]; then log_Message " - Jamf Connect application"; fi
     if [ ! -f "$launchAgentLocation" ]; then log_Message " - LaunchAgent"; fi
     if [ ! -f "$loginImageLocation" ]; then log_Message " - login image"; fi
-    if [ ! -f "$jamfConnectConfigProfile" ]; then log_Message " - .plist file"; fi
+    if [ ! -f "$jamfConnectMenuConfigProfile" ]; then log_Message " - .plist file"; fi
 }
 
 # Waits until the Jamf Connect pieces are in place. First waiting for two minutes, retrying after two minutes, then timing out 
 function jamfConnect_Check(){
     local counter=0
     local retry=0
-    until [ -f "$launchAgentLocation" ] && [ -f "$loginImageLocation" ] && [ -f "$jamfConnectConfigProfile" ] && [ -d "$jamfConnectAppLocation" ];
+    until [ -f "$launchAgentLocation" ] && [ -f "$loginImageLocation" ] && [ -f "$jamfConnectMenuConfigProfile" ] && [ -d "$jamfConnectAppLocation" ];
     do
         sleep 1
         ((counter++))
