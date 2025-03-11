@@ -13,6 +13,7 @@ readonly jamfConnectFilesArray=(
     "/Library/LaunchAgents/com.jamf.connect.plist"
     "/Library/Managed Preferences/com.jamf.connect.plist"
     "/Library/Managed Preferences/com.jamf.connect.login.plist"
+    "/Library/Managed Preferences/com.jamf.connect.shares.plist"
     "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
     "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
     "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
