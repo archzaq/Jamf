@@ -107,22 +107,29 @@ OOP
     return 1
 }
 
+function individual_Check(){
+    log_Message "Missing components:"
+    if [ ! -d "$jamfConnectAppLocation" ]; then log_Message " - Jamf Connect application"; fi
+    if [ ! -f "$launchAgentLocation" ]; then log_Message " - LaunchAgent"; fi
+    if [ ! -f "$loginImageLocation" ]; then log_Message " - login image"; fi
+    if [ ! -f "$jamfConnectConfigProfile" ]; then log_Message " - .plist file"; fi
+}
+
 # Waits until the Jamf Connect pieces are in place. First waiting for two minutes, retrying after two minutes, then timing out 
-function JamfConnect_Check(){
+function jamfConnect_Check(){
     local counter=0
     local retry=0
     until [ -f "$launchAgentLocation" ] && [ -f "$loginImageLocation" ] && [ -f "$jamfConnectConfigProfile" ] && [ -d "$jamfConnectAppLocation" ];
     do
         sleep 1
         ((counter++))
+        if [ $counter -eq 60 ];
+        then
+            individual_Check
+        fi
         if [ $counter -eq 120 ];
         then
             ((retry++))
-            log_Message "Missing components:"
-            if [ ! -d "$jamfConnectAppLocation" ]; then log_Message " - Jamf Connect application"; fi
-            if [ ! -f "$launchAgentLocation" ]; then log_Message " - LaunchAgent"; fi
-            if [ ! -f "$loginImageLocation" ]; then log_Message " - login image"; fi
-            if [ ! -f "$jamfConnectConfigProfile" ]; then log_Message " - .plist file"; fi
             if [ $retry -eq 1 ];
             then
                 log_Message "Process timed out, retrying."
@@ -219,7 +226,7 @@ If you have any questions or concerns, please contact the IT Service Desk at (31
     fi
 
     log_Message "Checking for Jamf Application, LaunchAgent, login image, and .plist file." 
-    if ! JamfConnect_Check;
+    if ! jamfConnect_Check;
     then
         log_Message "Exiting at Jamf Connect check."
         exit 1
