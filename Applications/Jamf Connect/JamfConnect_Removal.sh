@@ -2,41 +2,69 @@
 
 ##########################
 ### Author: Zac Reeves ###
+### Created: 7-25-23   ###
+### Updated: 3-11-25   ###
+### Version: 1.1       ###
 ##########################
 
-# Check if file paths exist
-if [ ! -f /usr/local/bin/authchanger ] || [ ! -f /usr/local/lib/pam/pam_saml.so.2 ] || [ ! -d "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle" ];
-then
-    echo "One or more required files not found"
-fi
+readonly logPath='/var/log/JamfConnect_Removal.log'
+readonly jamfConnectFilesArray=(
+    "/usr/local/bin/authchanger"
+    "/usr/local/lib/pam/pam_saml.so.2"
+    "/Library/LaunchAgents/com.jamf.connect.plist"
+    "/Library/Managed Preferences/com.jamf.connect.plist"
+    "/Library/Managed Preferences/com.jamf.connect.login.plist"
+    "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
+    "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
+    "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
+    "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg"
+    "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle"
+    "/Applications/Jamf Connect.app"
+)
 
-# Check if authchanger command exists
-if ! command -v /usr/local/bin/authchanger >/dev/null 2>&1;
-then
-    echo "authchanger command not found"
-else
-    # Reset authchanger
-    /usr/local/bin/authchanger -reset
-fi
+# Append current status to log file
+function log_Message() {
+    echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
+}
 
-sleep 2
+function main(){
+    echo "Log: $(date "+%F %T") Beginning Jamf Connect Removal script." | tee "$logPath"
 
-# Remove files and directories
-rm /usr/local/bin/authchanger
-rm /usr/local/lib/pam/pam_saml.so.2
-rm /Library/LaunchAgents/com.jamf.connect.plist
-rm "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23.pkg"
-rm "/Library/Application Support/JAMF/Receipts/SLULogos_JamfConnect_5-30-23-Signed.pkg"
-rm "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
-rm "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg"
-rm -r "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle"
-rm -r "/Applications/Jamf Connect.app"
+    # Check if authchanger command exists
+    if ! command -v /usr/local/bin/authchanger >/dev/null 2>&1;
+    then
+        log_Message "authchanger command not found."
+    else
+        log_Message "authchanger reset."
+        /usr/local/bin/authchanger -reset
+    fi
 
-if pgrep "Jamf Connect" >/dev/null;
-then
-    pkill "Jamf Connect"
-else
-    echo "Jamf Connect not running"
-fi
+    sleep 1
 
-exit 0
+    # Remove Jamf Connect files
+    for jamfConnectFile in "${jamfConnectFilesArray[@]}";
+    do
+        if [ -f "$jamfConnectFile" ];
+        then
+            log_Message "Removing $jamfConnectFile"
+            rm "$jamfConnectFile"
+        elif [ -d "$jamfConnectFile" ];
+        then
+            log_Message "Removing $jamfConnectFile"
+            rm -r "$jamfConnectFile"
+        fi
+    done
+
+    # Kill Jamf Connect
+    if pgrep "Jamf Connect" >/dev/null;
+    then
+        log_Message "Killing Jamf Connect."
+        pkill "Jamf Connect"
+    else
+        log_Message "Jamf Connect not running"
+    fi
+
+    exit 0
+}
+
+main
