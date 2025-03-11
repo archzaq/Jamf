@@ -8,10 +8,10 @@
 ##########################
 
 # Locations of Jamf Connect components
-readonly launchAgentLocation="/Library/LaunchAgents/com.jamf.connect.plist"
-readonly loginImageLocation="/usr/local/jamfconnect/login-background.jpeg"
-readonly jamfConnectConfigProfile="/Library/Managed Preferences/com.jamf.connect.login.plist"
-readonly jamfConnectAppLocation="/Applications/Jamf Connect.app"
+readonly launchAgentLocation='/Library/LaunchAgents/com.jamf.connect.plist'
+readonly loginImageLocation='/usr/local/jamfconnect/login-background.jpeg'
+readonly jamfConnectConfigProfile='/Library/Managed Preferences/com.jamf.connect.login.plist'
+readonly jamfConnectAppLocation='/Applications/Jamf Connect.app'
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
@@ -107,6 +107,7 @@ OOP
     return 1
 }
 
+# Print the missing components Jamf Connect requires
 function individual_Check(){
     log_Message "Missing components:"
     if [ ! -d "$jamfConnectAppLocation" ]; then log_Message " - Jamf Connect application"; fi
@@ -123,11 +124,11 @@ function jamfConnect_Check(){
     do
         sleep 1
         ((counter++))
-        if [ $counter -eq 60 ];
+        if [ $counter -eq 45 ];
         then
             individual_Check
         fi
-        if [ $counter -eq 120 ];
+        if [ $counter -eq 90 ];
         then
             ((retry++))
             if [ $retry -eq 1 ];
