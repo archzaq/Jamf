@@ -280,10 +280,10 @@ function token_Action() {
     local adminAccount="$3"
     local adminPassword="$4"
     local tokenAction="$5"
-    if [[ "$tokenAction" == 'assign' ]];
+    if [[ "$tokenAction" == 'Add Token' ]];
     then
         local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOn \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
-    elif [[ "$tokenAction" == 'remove' ]];
+    elif [[ "$tokenAction" == 'Remove Token' ]];
     then
         local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
     else
@@ -298,6 +298,7 @@ function token_Action() {
     fi
 }
 
+# Main logic of Secure Token action being taken
 function token_Action_Display() {
     local firstPrompt="$1"
     local secondPrompt="$2"
@@ -326,7 +327,7 @@ function token_Action_Display() {
                     log_Message "Exiting at second password prompt."
                 else
                     tokenPassword="$textFieldDialog"
-                    if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "assign";
+                    if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
                     then
                         log_Message "Error with Secure Token action."
                     else
@@ -393,7 +394,7 @@ function main() {
 
             'Add Token')
                 log_Message "Displaying first Add Token dialog."
-                if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "Add Token";
+                if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
                 then
                     log_Message "Going back to dropdown prompt."
                 else
@@ -404,7 +405,7 @@ function main() {
 
             'Remove Token')
                 log_Message "Displaying first Remove Token dialog."
-                if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "Remove Token";
+                if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
                 then
                     log_Message "Going back to dropdown prompt."
                 else
