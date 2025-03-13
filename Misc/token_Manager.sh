@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 3-12-25   ###
 ### Updated: 3-13-25   ###
-### Version: 1.2       ###
+### Version: 1.3       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -204,7 +204,7 @@ function get_SecureTokenArray() {
     for id in $(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}');
     do
         username="$(/usr/bin/dscl . -search /Users GeneratedUID ${id} | /usr/bin/awk 'NR==1{print $1}')"
-        if [ ! -z "$username" ];
+        if [[ ! -z "$username" && ! "$username" == '_'* ]];
         then
             secureTokenUserArray+=( "$username" )
             log_Message " - $username"
@@ -247,7 +247,7 @@ function get_NonSecureTokenArray() {
     fi
 }
 
-# Get an array of Non-Secure Token accounts
+# Get an array of Admin accounts
 function get_AdminAccountArray() {
     adminAccountArray=()
     log_Message "Admin Users:"
@@ -369,7 +369,7 @@ function main() {
     returnToDropdown=1
     while [ $returnToDropdown -eq 1 ];
     do
-        log_Message "Displaying dropdown prompt."
+        log_Message "Displaying dropdown dialog."
         if ! dropdown_Prompt "Select the desired Secure Token action:";
         then
             log_Message "Exiting at dropdown dialog."
@@ -393,23 +393,21 @@ function main() {
                 ;;
 
             'Add Token')
-                log_Message "Displaying first Add Token dialog."
+                log_Message "Displaying first Add Token text field dialog."
                 if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
                 then
                     log_Message "Going back to dropdown prompt."
                 else
-                    log_Message "Completed Add Token."
                     returnToDropdown=0
                 fi
                 ;;
 
             'Remove Token')
-                log_Message "Displaying first Remove Token dialog."
+                log_Message "Displaying first Remove Token text field dialog."
                 if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
                 then
                     log_Message "Going back to dropdown prompt."
                 else
-                    log_Message "Completed Remove Token."
                     returnToDropdown=0
                 fi
                 ;;
