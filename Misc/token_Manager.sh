@@ -3,12 +3,12 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 3-12-25   ###
-### Updated: 3-12-25   ###
-### Version: 1.0       ###
+### Updated: 3-13-25   ###
+### Version: 1.1       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
-readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ProfileBackgroundColor.icns'
+readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='Token Manager'
 readonly logPath='/var/log/token_Manager.log'
 
@@ -90,7 +90,7 @@ OOP
 
 # Get an array of Secure Token accounts
 function get_SecureTokenArray() {
-    local secureTokenUserArray=()
+    secureTokenUserArray=()
     log_Message "Secure Token Users:"
     for id in $(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}');
     do
@@ -103,11 +103,38 @@ function get_SecureTokenArray() {
     done
     if [[ -z "$secureTokenUserArray" ]];
     then
-        userList="No secure token accounts available."
-        dialogPhrase=$(echo "$userList")
+        log_Message " - None"
+        userList="Secure Token accounts:\nNone"
+        secureTokenPhrase=$(echo "$userList")
     else
         userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        dialogPhrase=$(echo -e "Secure Token accounts:\n$userList")
+        secureTokenPhrase=$(echo -e "Secure Token accounts:\n$userList")
+    fi
+}
+
+# Get an array of Non-Secure Token accounts
+function get_NonSecureTokenArray() {
+    nonSecureTokenUserArray=()
+    log_Message "Non-Secure Token Users:"
+    for username in $(/usr/bin/dscl . -list /Users | grep -v ^_.*);
+    do
+        if [[ ! "$username" == '_'* && ! "$username" == 'daemon' && ! "$username" == 'nobody' && ! "$username" == 'root' ]];
+        then
+            if ! printf '%s\n' "${secureTokenUserArray[@]}" | grep -q "^$username$";
+            then
+                nonSecureTokenUserArray+=( "$username" )
+                log_Message " - $username"
+            fi
+        fi
+    done
+    if [[ -z "$nonSecureTokenUserArray" ]];
+    then
+        log_Message " - None"
+        userList="Non-Secure Token accounts:\nNone"
+        nonSecureTokenPhrase=$(echo "$userList")
+    else
+        userList=$(printf "%s\n" "${nonSecureTokenUserArray[@]}")
+        nonSecureTokenPhrase=$(echo -e "Non-Secure Token accounts:\n$userList")
     fi
 }
 
@@ -122,7 +149,7 @@ function binary_Dialog() {
             set promptString to "$promptString"
             set iconPath to "$effectiveIconPath"
             set dialogTitle to "$dialogTitle"
-            set dialogResult to display dialog promptString buttons {"Go Back", "Close"} default button "Close" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            set dialogResult to display dialog promptString buttons {"Go Back", "Done"} default button "Done" with icon POSIX file iconPath with title dialogTitle giving up after 900
             set buttonChoice to button returned of dialogResult
             if buttonChoice is equal to "" then
                 return "timeout"
@@ -130,12 +157,12 @@ function binary_Dialog() {
                 return buttonChoice
             end if
         on error
-            return "cancelled"
+            return "Cancel"
         end try
 OOP
         )
         case "$binDialog" in
-            'cancelled' | 'Go Back')
+            'Cancel' | 'Go Back')
                 log_Message "User responded with: $binDialog"
                 return 1
                 ;;
@@ -209,7 +236,7 @@ OOP
 }
 
 # Function for adding and removing Secure Tokens
-function token_Action(){
+function token_Action() {
     local tokenAccount="$1"
     local tokenPassword="$2"
     local adminAccount="$3"
@@ -238,7 +265,7 @@ function log_Message() {
     echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
 }
 
-function main(){
+function main() {
     sudo_Check
     echo "Log: $(date "+%F %T") Beginning Token Manager script." | tee "$logPath"
 
@@ -262,7 +289,9 @@ function main(){
             'Token Status')
                 log_Message "Displaying Token Status dialog."
                 get_SecureTokenArray
-                if ! binary_Dialog "$dialogPhrase";
+                get_NonSecureTokenArray
+                secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
+                if ! binary_Dialog "$secureTokenCombinedPhrase";
                 then
                     log_Message "Going back to dropdown dialog."
                 else
@@ -301,7 +330,17 @@ function main(){
                                     log_Message "Error with assigning Secure Token."
                                 else
                                     log_Message "Secure Token successfully assigned!"
-                                    returnToDropdown=0
+                                    log_Message "Displaying Token Status dialog."
+                                    get_SecureTokenArray
+                                    get_NonSecureTokenArray
+                                    secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
+                                    if ! binary_Dialog "$secureTokenCombinedPhrase";
+                                    then
+                                        log_Message "Going back to dropdown dialog."
+                                    else
+                                        log_Message "Exiting at Token Status dialog."
+                                        returnToDropdown=0
+                                    fi
                                 fi
                             fi
                         fi
@@ -339,7 +378,17 @@ function main(){
                                     log_Message "Error with removing Secure Token."
                                 else
                                     log_Message "Secure Token successfully removed!"
-                                    returnToDropdown=0
+                                    log_Message "Displaying Token Status dialog."
+                                    get_SecureTokenArray
+                                    get_NonSecureTokenArray
+                                    secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
+                                    if ! binary_Dialog "$secureTokenCombinedPhrase";
+                                    then
+                                        log_Message "Going back to dropdown dialog."
+                                    else
+                                        log_Message "Exiting at Token Status dialog."
+                                        returnToDropdown=0
+                                    fi
                                 fi
                             fi
                         fi
@@ -353,7 +402,7 @@ function main(){
                 ;;
         esac
     done
-    
+
     log_Message "Exiting!"
     exit 0
 }
