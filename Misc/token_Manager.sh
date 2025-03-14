@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 3-12-25   ###
-### Updated: 3-13-25   ###
-### Version: 1.3       ###
+### Updated: 3-14-25   ###
+### Version: 1.4       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -16,16 +16,31 @@ readonly logPath='/var/log/token_Manager.log'
 function sudo_Check() {
     if [ "$(id -u)" -ne 0 ];
     then
-        echo "Please run this script as root or using sudo!"
+        alert_Dialog "Please run this script as root or using sudo!"
         exit 1
     fi
+}
+
+# Append current status to log file
+function log_Message() {
+    printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
 }
 
 # Check if account is in the admin group
 function admin_Check(){
     local account="$1"
-    local groupList=$(/usr/bin/groups "$account")
-    if [[ $groupList == *" admin "* ]];
+    if /usr/sbin/dseditgroup -o checkmember -m "$account" admin >/dev/null;
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if account exists
+function account_Check() {
+    local account="$1"
+    if /usr/bin/id "$account" >/dev/null;
     then
         return 0
     else
@@ -63,6 +78,37 @@ function icon_Check() {
     return 0
 }
 
+# AppleScript - Create alert dialog window
+function alert_Dialog() {
+    local promptString="$1"
+    log_Message "Displaying alert dialog."
+    alertDialog=$(/usr/bin/osascript <<OOP
+    try
+        set promptString to "$promptString"
+        set choice to (display alert promptString as critical buttons "OK" default button 1 giving up after 900)
+        if (gave up of choice) is true then
+            return "timeout"
+        else
+            return (button returned of choice)
+        end if
+    on error
+        return "Error"
+    end try
+OOP
+    )
+    case "$alertDialog" in
+        'Error')
+            log_Message "Unable to show alert dialog."
+            ;;
+        'timeout')
+            log_Message "Alert timed out."
+            ;;
+        *)
+            log_Message "Continued through alert dialog."
+            ;;
+    esac
+}
+
 # AppleScript - Ask user to choose from a list of items
 function dropdown_Prompt() {
     local promptString="$1"
@@ -73,9 +119,9 @@ function dropdown_Prompt() {
         set promptString to "$promptString"
         set dialogTitle to "$dialogTitle"
         set dropdownOptions to {"Token Status", "Add Token", "Remove Token"}
-        set userChoice to (choose from list dropdownOptions with prompt promptString default items "Token Status" with title dialogTitle)
+        set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Token Status" with title dialogTitle)
         if userChoice is false then
-            return "cancelled"
+            return "quit"
         else if userChoice is {} then
             return "timeout"
         else
@@ -84,8 +130,8 @@ function dropdown_Prompt() {
 OOP
         )
         case "$dropdownPrompt" in
-            'cancelled')
-                log_Message "User selected cancel."
+            'quit')
+                log_Message "User selected quit."
                 return 1
                 ;;
             'timeout')
@@ -180,8 +226,8 @@ OOP
                 ((count++))
                 ;;
             '')
-                log_Message "Nothing entered, re-prompting."
-                ((count++))
+                log_Message "Nothing entered in text field."
+                alert_Dialog "Please enter something."
                 ;;
             *)
                 if [[ "$dialogType" == 'hidden' ]];
@@ -197,79 +243,107 @@ OOP
     return 1
 }
 
-# Get an array of Secure Token accounts
-function get_SecureTokenArray() {
+# Grabs lists of each users current Secure Token and Admin status
+function get_UserArrays() {
     secureTokenUserArray=()
-    log_Message "Secure Token Users:"
-    for id in $(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}');
+    nonSecureTokenUserArray=()
+    adminAccountArray=()
+    secureTokenAdminArray=()
+    log_Message "Getting secure token UIDs."
+    local secureTokenUIDs=($(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}'))
+    for username in $(/usr/bin/dscl . -list /Users | grep -v "^_");
     do
-        username="$(/usr/bin/dscl . -search /Users GeneratedUID ${id} | /usr/bin/awk 'NR==1{print $1}')"
-        if [[ ! -z "$username" && ! "$username" == '_'* ]];
+        if [[ "$username" == 'daemon' || "$username" == 'nobody' || "$username" == 'root' ]];
         then
-            secureTokenUserArray+=( "$username" )
-            log_Message " - $username"
+            continue
+        fi
+        local admin=0
+        local secureToken=0
+        if admin_Check "$username";
+        then
+            admin=1
+        fi
+        local uuid=$(/usr/bin/dscl . -read /Users/"$username" GeneratedUID 2>/dev/null | awk '{print $2}')
+        for tokenUID in "${secureTokenUIDs[@]}";
+        do
+            if [[ "$uuid" == "$tokenUID" ]];
+            then
+                secureToken=1
+                break
+            fi
+        done
+        if [ $admin -eq 1 ] && [ $secureToken -eq 1 ];
+        then
+            secureTokenUserArray+=("$username")
+            adminAccountArray+=("$username")
+            secureTokenAdminArray+=("$username")
+        elif [ $admin -eq 1 ] && [ $secureToken -eq 0 ];
+        then
+            nonSecureTokenUserArray+=("$username")
+            adminAccountArray+=("$username")
+        elif [ $admin -eq 0 ] && [ $secureToken -eq 1 ];
+        then
+            secureTokenUserArray+=("$username")
+        elif [ $admin -eq 0 ] && [ $secureToken -eq 0 ];
+        then
+            nonSecureTokenUserArray+=("$username")
         fi
     done
-    if [[ -z "$secureTokenUserArray" ]];
+
+    log_Message "Secure Token accounts:"
+    if [[ ${#secureTokenUserArray[@]} -eq 0 ]];
     then
-        log_Message " - None"
-        userList="Secure Token accounts:\nNone"
-        secureTokenPhrase=$(echo "$userList")
+        secureTokenPhrase=$(printf "Secure Token accounts:\nNone")
+        log_Message "None"
     else
         userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        secureTokenPhrase=$(echo -e "Secure Token accounts:\n$userList")
+        secureTokenPhrase=$(printf "Secure Token accounts:\n%s" "$userList")
+        for user in "${secureTokenUserArray[@]}";
+        do
+            log_Message " - $user"
+        done
     fi
-}
 
-# Get an array of Non-Secure Token accounts
-function get_NonSecureTokenArray() {
-    nonSecureTokenUserArray=()
-    log_Message "Non-Secure Token Users:"
-    for username in $(/usr/bin/dscl . -list /Users | grep -v ^_.*);
-    do
-        if [[ ! "$username" == '_'* && ! "$username" == 'daemon' && ! "$username" == 'nobody' && ! "$username" == 'root' ]];
-        then
-            if ! printf '%s\n' "${secureTokenUserArray[@]}" | grep -q "^$username$";
-            then
-                nonSecureTokenUserArray+=( "$username" )
-                log_Message " - $username"
-            fi
-        fi
-    done
-    if [[ -z "$nonSecureTokenUserArray" ]];
+    log_Message "Non-Secure Token accounts:"
+    if [[ ${#nonSecureTokenUserArray[@]} -eq 0 ]];
     then
-        log_Message " - None"
-        userList="Non-Secure Token accounts:\nNone"
-        nonSecureTokenPhrase=$(echo "$userList")
+        nonSecureTokenPhrase=$(printf "Non-Secure Token accounts:\nNone")
+        log_Message "None"
     else
         userList=$(printf "%s\n" "${nonSecureTokenUserArray[@]}")
-        nonSecureTokenPhrase=$(echo -e "Non-Secure Token accounts:\n$userList")
+        nonSecureTokenPhrase=$(printf "Non-Secure Token accounts:\n%s" "$userList")
+        for user in "${nonSecureTokenUserArray[@]}";
+        do
+            log_Message " - $user"
+        done
     fi
-}
 
-# Get an array of Admin accounts
-function get_AdminAccountArray() {
-    adminAccountArray=()
-    log_Message "Admin Users:"
-    for username in $(/usr/bin/dscl . -list /Users | grep -v ^_.*);
-    do
-        if [[ ! "$username" == '_'* && ! "$username" == 'daemon' && ! "$username" == 'nobody' && ! "$username" == 'root' ]];
-        then
-            if admin_Check "$username";
-            then
-                adminAccountArray+=( "$username" )
-                log_Message " - $username"
-            fi
-        fi
-    done
-    if [[ -z "$adminAccountArray" ]];
+    log_Message "Admin accounts:"
+    if [[ ${#adminAccountArray[@]} -eq 0 ]];
     then
-        log_Message " - None"
-        userList="Admin accounts:\nNone"
-        adminAccountPhrase=$(echo "$userList")
+        adminAccountPhrase=$(printf "Admin accounts:\nNone")
+        log_Message "None"
     else
         userList=$(printf "%s\n" "${adminAccountArray[@]}")
-        adminAccountPhrase=$(echo -e "Admin accounts:\n$userList")
+        adminAccountPhrase=$(printf "Admin accounts:\n%s" "$userList")
+        for user in "${adminAccountArray[@]}";
+        do
+            log_Message " - $user"
+        done
+    fi
+
+    log_Message "Admin accounts with Secure Tokens:"
+    if [[ ${#secureTokenAdminArray[@]} -eq 0 ]];
+    then
+        secureTokenAdminPhrase=$(printf "Admin accounts with Secure Tokens:\nNone")
+        log_Message "None"
+    else
+        userList=$(printf "%s\n" "${secureTokenAdminArray[@]}")
+        secureTokenAdminPhrase=$(printf "Admin accounts with Secure Tokens:\n%s" "$userList")
+        for user in "${secureTokenAdminArray[@]}";
+        do
+            log_Message " - $user"
+        done
     fi
 }
 
@@ -309,19 +383,31 @@ function token_Action_Display() {
     else
         log_Message "Continued through $tokenActionType text field dialog."
         adminAccount="$textFieldDialog"
+        if ! account_Check "$adminAccount";
+        then
+            log_Message "$adminAccount does not exist."
+            alert_Dialog "$adminAccount does not exist!"
+            return 1
+        fi
         if ! textField_Dialog "$secondPrompt";
         then
             log_Message "Exiting at second $tokenActionType text field dialog."
         else
             log_Message "Continued through second $tokenActionType text field dialog."
             tokenAccount="$textFieldDialog"
-            log_Message "Prompting for password."
+            if ! account_Check "$tokenAccount";
+            then
+                log_Message "$tokenAccount does not exist."
+                alert_Dialog "$tokenAccount does not exist!"
+                return 1
+            fi
+            log_Message "Prompting for $adminAccount password."
             if ! textField_Dialog "Enter the password for $adminAccount:" "hidden";
             then
                 log_Message "Exiting at first password prompt."
             else
                 adminPassword="$textFieldDialog"
-                log_Message "Prompting for password."
+                log_Message "Prompting for $tokenAccount password."
                 if ! textField_Dialog "Enter the password for $tokenAccount:" "hidden";
                 then
                     log_Message "Exiting at second password prompt."
@@ -329,12 +415,16 @@ function token_Action_Display() {
                     tokenPassword="$textFieldDialog"
                     if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
                     then
-                        log_Message "Error with Secure Token action."
+                        adminPassword=''
+                        tokenPassword=''
+                        log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")"
+                        alert_Dialog "Error with Secure token action!\n\nPriviliged Account:\n${adminAccount}\n\nNon-Priviliged Account:\n${tokenAccount}\n\nToken Action:\n${tokenActionType}"
                     else
+                        adminPassword=''
+                        tokenPassword=''
                         log_Message "$tokenActionType completed!"
                         log_Message "Displaying Token Status dialog."
-                        get_SecureTokenArray
-                        get_NonSecureTokenArray
+                        get_UserArrays
                         secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
                         if ! binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
                         then
@@ -348,20 +438,18 @@ function token_Action_Display() {
             fi
         fi
     fi
+    adminPassword=''
+    tokenPassword=''
     return 1
-}
-
-# Append current status to log file
-function log_Message() {
-    echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
 }
 
 function main() {
     sudo_Check
-    echo "Log: $(date "+%F %T") Beginning Token Manager script." | tee "$logPath"
+    printf "Log: $(date "+%F %T") Beginning Token Manager script.\n" | tee "$logPath"
 
     if ! icon_Check;
     then
+        alert_Dialog "Missing required icon files!"
         log_Message "Exiting for no icon."
         exit 1
     fi
@@ -373,50 +461,49 @@ function main() {
         if ! dropdown_Prompt "Select the desired Secure Token action:";
         then
             log_Message "Exiting at dropdown dialog."
-            exit 0
+            returnToDropdown=0
+        else
+            get_UserArrays
+            case "$dropdownPrompt" in
+                'Token Status')
+                    secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
+                    log_Message "Displaying Token Status dialog."
+                    if ! binary_Dialog "$secureTokenCombinedPhrase";
+                    then
+                        log_Message "Going back to dropdown dialog."
+                    else
+                        log_Message "Exiting at Token Status dialog."
+                        returnToDropdown=0
+                    fi
+                    ;;
+
+                'Add Token')
+                    log_Message "Displaying first Add Token text field dialog."
+                    if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenAdminPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
+                    then
+                        log_Message "Going back to dropdown prompt."
+                    else
+                        returnToDropdown=0
+                    fi
+                    ;;
+
+                'Remove Token')
+                    log_Message "Displaying first Remove Token text field dialog."
+                    if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
+                    then
+                        log_Message "Going back to dropdown prompt."
+                    else
+                        returnToDropdown=0
+                    fi
+                    ;;
+
+                *)
+                    alert_Dialog "Unknown option chosen from dropdown menu!"
+                    log_Message "Error, exiting after option chosen from dropdown prompt."
+                    exit 1
+                    ;;
+            esac
         fi
-
-        get_SecureTokenArray
-        get_NonSecureTokenArray
-        get_AdminAccountArray
-        case "$dropdownPrompt" in
-            'Token Status')
-                secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
-                log_Message "Displaying Token Status dialog."
-                if ! binary_Dialog "$secureTokenCombinedPhrase";
-                then
-                    log_Message "Going back to dropdown dialog."
-                else
-                    log_Message "Exiting at Token Status dialog."
-                    returnToDropdown=0
-                fi
-                ;;
-
-            'Add Token')
-                log_Message "Displaying first Add Token text field dialog."
-                if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
-                then
-                    log_Message "Going back to dropdown prompt."
-                else
-                    returnToDropdown=0
-                fi
-                ;;
-
-            'Remove Token')
-                log_Message "Displaying first Remove Token text field dialog."
-                if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
-                then
-                    log_Message "Going back to dropdown prompt."
-                else
-                    returnToDropdown=0
-                fi
-                ;;
-
-            *)
-                log_Message "Error, exiting after option chosen from dropdown prompt."
-                exit 1
-                ;;
-        esac
     done
 
     log_Message "Exiting!"
