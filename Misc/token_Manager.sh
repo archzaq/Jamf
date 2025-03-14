@@ -426,10 +426,8 @@ function token_Action_Display() {
                         log_Message "Displaying Token Status dialog."
                         get_UserArrays
                         secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
-                        if ! binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
+                        if binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
                         then
-                            log_Message "Going back to dropdown dialog."
-                        else
                             log_Message "Exiting at Token Status dialog."
                             return 0
                         fi
@@ -481,7 +479,7 @@ function main() {
                     log_Message "Displaying first Add Token text field dialog."
                     if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenAdminPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
                     then
-                        log_Message "Going back to dropdown prompt."
+                        log_Message "Going back to dropdown dialog."
                     else
                         returnToDropdown=0
                     fi
@@ -491,7 +489,7 @@ function main() {
                     log_Message "Displaying first Remove Token text field dialog."
                     if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
                     then
-                        log_Message "Going back to dropdown prompt."
+                        log_Message "Going back to dropdown dialog."
                     else
                         returnToDropdown=0
                     fi
@@ -499,7 +497,7 @@ function main() {
 
                 *)
                     alert_Dialog "Unknown option chosen from dropdown menu!"
-                    log_Message "Error, exiting after option chosen from dropdown prompt."
+                    log_Message "Error, exiting after option chosen from dropdown dialog."
                     exit 1
                     ;;
             esac
