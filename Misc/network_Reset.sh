@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 3-3-25    ###
-### Updated: 3-26-25   ###
-### Version: 1.3       ###
+### Updated: 3-27-25   ###
+### Version: 1.4       ###
 ##########################
 
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
@@ -72,6 +72,37 @@ function login_Check() {
     esac
 }
 
+# Look for specific networking files, if present, backup and then delete them
+function backup_Network_Files() {
+    for backupNetworkFile in "${networkFilesArray[@]}";
+    do
+        local fullFilePath="${systemConfigurationFolder}/${backupNetworkFile}"
+        if [[ -f "$fullFilePath" ]];
+        then
+            log_Message "Backing up $fullFilePath"
+            /bin/cp "$fullFilePath" "$backupTempFolder"
+            if [[ $? -eq 0 ]];
+            then
+                log_Message "Removing $fullFilePath"
+                /bin/rm "$fullFilePath"
+            else
+                log_Message "Failed to copy $fullFilePath"
+            fi
+        fi
+    done
+    cd "${backupFolderLocation}" && su "$userAccount" -c "/usr/bin/tar -czf \"${backupTarLocation}\" networkFiles"
+    if [[ $? -eq 0 ]];
+    then
+        log_Message "Backed up network files are located at $backupTarLocation"
+        /bin/rm -r "$backupTempFolder"
+        return 0
+    else
+        log_Message "tar command failed."
+        return 1
+    fi
+}
+
+# Remove saved networks from wireless adapters
 function remove_PreferredWirelessNetworks() {
     local hardwareIDList=$(/usr/sbin/networksetup -listallhardwareports | awk '/Device: / {print $2}')
     local wifiIDList=()
@@ -85,8 +116,12 @@ function remove_PreferredWirelessNetworks() {
     done
     for id in $wifiIDList;
     do
-        /usr/sbin/networksetup -removeallpreferredwirelessnetworks $id 
-        log_Message "Removing preferred networks list for $id"
+        if /usr/sbin/networksetup -removeallpreferredwirelessnetworks $id;
+        then
+            log_Message "Removing preferred networks list for $id"
+        else
+            log_Message "Error in removing preferred networks list for $id"
+        fi
     done
 }
 
@@ -131,36 +166,6 @@ OOP
     return 1
 }
 
-# Look for specific networking files, if present, backup and then delete them
-function backup_Network_Files() {
-    for backupNetworkFile in "${networkFilesArray[@]}";
-    do
-        local fullFilePath="${systemConfigurationFolder}/${backupNetworkFile}"
-        if [[ -f "$fullFilePath" ]];
-        then
-            log_Message "Backing up $fullFilePath"
-            /bin/cp "$fullFilePath" "$backupTempFolder"
-            if [[ $? -eq 0 ]];
-            then
-                log_Message "Removing $fullFilePath"
-                /bin/rm "$fullFilePath"
-            else
-                log_Message "Failed to copy $fullFilePath"
-            fi
-        fi
-    done
-    cd "${backupFolderLocation}" && su "$userAccount" -c "/usr/bin/tar -czf \"${backupTarLocation}\" networkFiles"
-    if [[ $? -eq 0 ]];
-    then
-        log_Message "Backed up network files are located at $backupTarLocation"
-        /bin/rm -r "$backupTempFolder"
-        return 0
-    else
-        log_Message "tar command failed."
-        return 1
-    fi
-}
-
 # AppleScript - Informing the user of what took place
 function inform_Dialog() {
     local promptString="$1"
@@ -196,11 +201,11 @@ OOP
 
 # Append current status to log file
 function log_Message() {
-    echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
+    printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
 }
 
 function main() {
-    echo "Log: $(date "+%F %T") Beginning Network Reset script." | tee "$logPath"
+    printf "Log: $(date "+%F %T") Beginning Network Reset script.\n" | tee "$logPath"
 
     if ! icon_Check;
     then
