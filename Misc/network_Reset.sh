@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 3-3-25    ###
-### Updated: 3-7-25    ###
-### Version: 1.2       ###
+### Updated: 3-26-25   ###
+### Version: 1.3       ###
 ##########################
 
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
@@ -70,6 +70,24 @@ function login_Check() {
             log_Message "\"$userAccount\" currently logged in."
             return 0
     esac
+}
+
+function remove_PreferredWirelessNetworks() {
+    local hardwareIDList=$(/usr/sbin/networksetup -listallhardwareports | awk '/Device: / {print $2}')
+    local wifiIDList=()
+    for id in $hardwareIDList;
+    do
+        if /usr/sbin/networksetup -listpreferredwirelessnetworks $id >/dev/null;
+        then
+            wifiIDList+=("$id")
+            log_Message "$id is a Wi-Fi adapter."
+        fi
+    done
+    for id in $wifiIDList;
+    do
+        /usr/sbin/networksetup -removeallpreferredwirelessnetworks $id 
+        log_Message "Removing preferred networks list for $id"
+    done
 }
 
 # AppleScript - Informing the user and giving them two choices
@@ -217,6 +235,8 @@ function main() {
         log_Message "Exiting at file backup."
         exit 1
     fi
+
+    remove_PreferredWirelessNetworks
 
     log_Message "Displaying last dialog."
     if ! inform_Dialog "Process Completed!\n\nPlease restart the computer to reconfigure your internet and wireless functionality.";
