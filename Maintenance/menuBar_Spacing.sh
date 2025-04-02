@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 4-2-25    ###
 ### Updated: 4-2-25    ###
-### Version: 1.2       ###
+### Version: 1.3       ###
 ##########################
 
 readonly logPath='/var/log/menuBar_Spacing.log'
@@ -14,14 +14,32 @@ function log_Message() {
     printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
 }
 
+# Check if someone is logged into the device
+function login_Check() {
+    account="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+    if [[ "$account" == 'root' ]] || [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
+    then
+        log_Message "Invalid user logged in: $account"
+        return 1
+    else
+        log_Message "Valid user logged in: $account"
+        return 0
+    fi
+}
+
 function main() {
     printf "Log: $(date "+%F %T") Beginning Menu Bar Spacing script.\n" | tee "$logPath"
+    if ! login_Check;
+    then
+        log_Message "Exiting at login check."
+        exit 1
+    fi
     log_Message "Setting Menu Bar icon spacing."
-    if /usr/bin/defaults -currentHost write -globalDomain NSStatusItemSpacing -int 10;
+    if $(su "$account" -c "/usr/bin/defaults -currentHost write -globalDomain NSStatusItemSpacing -int 10");
     then
         log_Message "Successfully set Menu Bar icon spacing."
         log_Message "Setting Menu Bar icon selection spacing."
-        if /usr/bin/defaults -currentHost write -globalDomain NSStatusItemSelectionPadding -int 8;
+        if $(su "$account" -c "/usr/bin/defaults -currentHost write -globalDomain NSStatusItemSelectionPadding -int 8");
         then
             log_Message "Successfully set Menu Bar icon selection spacing."
             log_Message "Exiting!"
