@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 4-2-25    ###
 ### Updated: 4-2-25    ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly logPath='/var/log/menuBar_Spacing.log'
@@ -16,9 +16,11 @@ function log_Message() {
 
 function main() {
     printf "Log: $(date "+%F %T") Beginning Menu Bar Spacing script.\n" | tee "$logPath"
+    log_Message "Setting Menu Bar icon spacing."
     if /usr/bin/defaults -currentHost write -globalDomain NSStatusItemSpacing -int 10;
     then
         log_Message "Successfully set Menu Bar icon spacing."
+        log_Message "Setting Menu Bar icon selection spacing."
         if /usr/bin/defaults -currentHost write -globalDomain NSStatusItemSelectionPadding -int 8;
         then
             log_Message "Successfully set Menu Bar icon selection spacing."
@@ -30,7 +32,7 @@ function main() {
     else
         log_Message "Unable to set Menu Bar icon spacing."
     fi
-    log_Message "Exiting without making any changes."
+    log_Message "Exiting and reverting changes."
     /usr/bin/defaults -currentHost delete -globalDomain NSStatusItemSpacing
     /usr/bin/defaults -currentHost delete -globalDomain NSStatusItemSelectionPadding
     exit 1
