@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 1-30-25   ###
-### Updated: 2-25-25   ###
-### Version: 1.6       ###
+### Updated: 4-16-25   ###
+### Version: 1.7       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -125,9 +125,9 @@ function custom_Search() {
         echo "Log: $(date "+%F %T") Searching for files at $path for: $firstDialog" >> "$foundFilesPath"
         if [ "$quickSearchActivated" -eq 0 ];
         then
-            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
+            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null | sort -r >> "$foundFilesPath"
         else
-            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null >> "$foundFilesPath"
+            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null | sort -r >> "$foundFilesPath"
         fi
         echo "Log: $(date "+%F %T") Completed search at $path" | tee -a "$logPath"
         return 0
@@ -147,11 +147,11 @@ function within_Files() {
         then
             find "$path" -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r >> "$foundFilesPath"
         else
             find "$path" -path "/Users/$userAccount/Library" -prune -o -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null >> "$foundFilesPath"
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r >> "$foundFilesPath"
         fi
         echo "Log: $(date "+%F %T") Completed search within files at $path" | tee -a "$logPath"
         return 0
