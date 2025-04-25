@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 6-28-23   ###
-### Updated: 2-7-25    ###
-### Version: 2.4       ###
+### Updated: 4-25-25   ###
+### Version: 2.5       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -89,7 +89,7 @@ function department_Prompt() {
         "ITS - Information Technology Services", "Lab Device", "LIB - Libraries", "LAW - School of Law",\
         "MAR - Marketing & Communications", "MED - Medical School", "MM - Mission & Ministry",\
         "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
-        "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art",\
+        "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art", "NEU - Neurology",\
         "PATH - Pathology", "PAR - Parks College", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
         "PHYS - Physics", "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
         "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
