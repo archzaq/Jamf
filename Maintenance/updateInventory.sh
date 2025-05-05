@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 7-12-23   ###
-### Updated: 6-27-24   ###
-### Version: 1.10      ###
+### Created: 07-12-23  ###
+### Updated: 05-05-24  ###
+### Version: 2.0       ###
 ##########################
 
 readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
@@ -64,7 +64,9 @@ function check_Name() {
     fi
 }
 
-
+/usr/bin/caffeinate -d &
+CAFFEINATE_PID=$!
+trap "kill $CAFFEINATE_PID" EXIT
 
 # Enrollment policies
 echo "Log: $(date "+%F %T") Checking for lingering enrollment policies" | tee "$logPath"
