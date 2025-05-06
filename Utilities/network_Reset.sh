@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 3-3-25    ###
-### Updated: 3-27-25   ###
-### Version: 1.4       ###
+### Created: 03-03-25  ###
+### Updated: 05-06-25  ###
+### Version: 1.5       ###
 ##########################
 
 readonly userAccount="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
@@ -12,6 +12,7 @@ readonly userHomeFolder="/Users/${userAccount}"
 readonly backupFolderLocation="${userHomeFolder}/.SLU"
 readonly backupTempFolder="${backupFolderLocation}/networkFiles"
 readonly backupTarLocation="${backupFolderLocation}/networkFiles.tgz"
+readonly preferencesFolderKnownNetworks='/Library/Preferences/com.apple.wifi.known-networks.plist'
 readonly systemConfigurationFolder='/Library/Preferences/SystemConfiguration'
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ProfileBackgroundColor.icns'
@@ -90,6 +91,18 @@ function backup_Network_Files() {
             fi
         fi
     done
+    if [[ -f "$preferencesFolderKnownNetworks" ]];
+    then
+        log_Message "Backing up $preferencesFolderKnownNetworks"
+        /bin/cp "$preferencesFolderKnownNetworks" "$backupTempFolder"
+        if [[ $? -eq 0 ]];
+        then
+            log_Message "Removing $preferencesFolderKnownNetworks"
+            /bin/rm "$preferencesFolderKnownNetworks"
+        else
+            log_Message "Failed to copy $preferencesFolderKnownNetworks"
+        fi
+    fi
     cd "${backupFolderLocation}" && su "$userAccount" -c "/usr/bin/tar -czf \"${backupTarLocation}\" networkFiles"
     if [[ $? -eq 0 ]];
     then
