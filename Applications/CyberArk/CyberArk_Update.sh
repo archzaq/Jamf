@@ -7,7 +7,7 @@
 ### Version: 1.1       ###
 ##########################
 
-readonly logPath='/var/log/CyberArk_PWChange.log'
+readonly logPath='/var/log/CyberArk_Update.log'
 adminUsername="$4"
 oldP="$5"
 newP="$6"
