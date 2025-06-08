@@ -4,13 +4,13 @@
 ### Author: Zac Reeves ###
 ### Created: 06-07-25  ###
 ### Updated: 06-08-25  ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly logPath='/var/log/CyberArk_Update.log'
-adminUsername="$4"
-oldP="$5"
-newP="$6"
+readonly admin="$4"
+old="$5"
+new="$6"
 
 # Append current status to log file
 function log_Message() {
@@ -84,7 +84,7 @@ function clear_PassPolicy() {
 
 # Ensure arguments are passed
 function arg_Check() {
-    if [ -z "$adminUsername" ] || [ -z "$oldP" ] || [ -z "$newP" ];
+    if [ -z "$admin" ] || [ -z "$old" ] || [ -z "$new" ];
     then
         log_Message "ERROR: Missing critical arguments"
         exit 1
@@ -92,8 +92,8 @@ function arg_Check() {
 }
 
 function trap_Clean() {
-    oldP=''
-    newP=''
+    old=''
+    new=''
 }
 
 function main() {
@@ -102,39 +102,39 @@ function main() {
 
     arg_Check
 
-    if ! account_Check "$adminUsername";
+    if ! account_Check "$admin";
     then
-        log_Message "$adminUsername not found."
+        log_Message "$admin not found."
         exit 1
     fi
 
-    if check_Token "$adminUsername";
+    if check_Token "$admin";
     then
-        log_Message "Secure Token currently Enabled for $adminUsername"
+        log_Message "Secure Token currently Enabled for $admin"
         hasSecureToken=0
     else
-        log_Message "Secure Token currently Disabled for $adminUsername"
+        log_Message "Secure Token currently Disabled for $admin"
         hasSecureToken=1
     fi
 
-    log_Message "Attempting to change password for $adminUsername"
-    if change_Pass "$adminUsername" "$newP" "$adminUsername" "$oldP";
+    log_Message "Attempting to change password for $admin"
+    if change_Pass "$admin" "$new" "$admin" "$old";
     then
         log_Message "Password change command completed successfully"
-        if verify_PassChange "$adminUsername" "$newP";
+        if verify_PassChange "$admin" "$new";
         then
             log_Message "Password change verified successfully"
-            if ! update_Keychain "$adminUsername" "$oldP" "$newP";
+            if ! update_Keychain "$admin" "$old" "$new";
             then
                 log_Message "ERROR: Keychain update failed"
             fi
-            if ! clear_PassPolicy "$adminUsername";
+            if ! clear_PassPolicy "$admin";
             then
                 log_Message "ERROR: Clear password policy failed"
             fi
             if [[ "$hasSecureToken" -eq 0 ]];
             then
-                if check_Token "$adminUsername";
+                if check_Token "$admin";
                 then
                     log_Message "Secure token preserved after password change"
                 else
