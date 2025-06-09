@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-07-25  ###
-### Updated: 06-08-25  ###
-### Version: 1.2       ###
+### Updated: 06-09-25  ###
+### Version: 1.3       ###
 ##########################
 
 readonly logPath='/var/log/CyberArk_Update.log'
@@ -118,40 +118,42 @@ function main() {
     fi
 
     log_Message "Attempting to change password for $admin"
-    if change_Pass "$admin" "$new" "$admin" "$old";
+    if ! change_Pass "$admin" "$new" "$admin" "$old";
     then
-        log_Message "Password change command completed successfully"
-        if verify_PassChange "$admin" "$new";
-        then
-            log_Message "Password change verified successfully"
-            if ! update_Keychain "$admin" "$old" "$new";
-            then
-                log_Message "ERROR: Keychain update failed"
-            fi
-            if ! clear_PassPolicy "$admin";
-            then
-                log_Message "ERROR: Clear password policy failed"
-            fi
-            if [[ "$hasSecureToken" -eq 0 ]];
-            then
-                if check_Token "$admin";
-                then
-                    log_Message "Secure token preserved after password change"
-                else
-                    log_Message "Secure token lost during password change"
-                fi
-            fi
-            
-            log_Message "CyberArk password change completed successfully!"
-            exit 0
-        else
-            log_Message "ERROR: Password change verification failed"
-            exit 1
-        fi
-    else
         log_Message "ERROR: Password change command failed"
         exit 1
     fi
+
+    log_Message "Password change command completed successfully"
+    if ! verify_PassChange "$admin" "$new";
+    then
+        log_Message "ERROR: Password change verification failed"
+        exit 1
+    fi
+
+    log_Message "Password change verified successfully"
+    if ! update_Keychain "$admin" "$old" "$new";
+    then
+        log_Message "ERROR: Keychain update failed"
+    fi
+
+    if ! clear_PassPolicy "$admin";
+    then
+        log_Message "ERROR: Clear password policy failed"
+    fi
+
+    if [[ "$hasSecureToken" -eq 0 ]];
+    then
+        if check_Token "$admin";
+        then
+            log_Message "Secure token preserved after password change"
+        else
+            log_Message "Secure token lost during password change"
+        fi
+    fi
+    
+    log_Message "CyberArk password change completed successfully!"
+    exit 0
 }
 
 main
