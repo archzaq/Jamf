@@ -42,7 +42,7 @@ function change_Pass() {
     return $?
 }
 
-# Verfity password was changed properly
+# Verify password was changed properly
 function verify_PassChange() {
     local account="$1"
     local newPass="$2"
@@ -70,7 +70,7 @@ function update_Keychain() {
             return 1
         fi
     else
-        log_Message "Login keychain not found - skipping keychain update"
+        log_Message "Login keychain not found, skipping keychain update"
         return 0
     fi
 }
@@ -102,12 +102,15 @@ function main() {
 
     arg_Check
 
+    log_Message "Checking for $admin"
     if ! account_Check "$admin";
     then
-        log_Message "$admin not found."
+        log_Message "$admin not found"
         exit 1
     fi
+    log_Message "$admin found"
 
+    log_Message "Checking for Secure Token"
     if check_Token "$admin";
     then
         log_Message "Secure Token currently Enabled for $admin"
@@ -123,24 +126,29 @@ function main() {
         log_Message "ERROR: Password change command failed"
         exit 1
     fi
-
     log_Message "Password change command completed successfully"
+
+    log_Message "Verifying password change"
     if ! verify_PassChange "$admin" "$new";
     then
         log_Message "ERROR: Password change verification failed"
         exit 1
     fi
-
     log_Message "Password change verified successfully"
+
+    log_Message "Updating account keychain"
     if ! update_Keychain "$admin" "$old" "$new";
     then
         log_Message "ERROR: Keychain update failed"
     fi
+    log_Message "Account keychain updated"
 
+    log_Message "Clearing password policy"
     if ! clear_PassPolicy "$admin";
     then
         log_Message "ERROR: Clear password policy failed"
     fi
+    log_Message "Password policy cleared"
 
     if [[ "$hasSecureToken" -eq 0 ]];
     then
