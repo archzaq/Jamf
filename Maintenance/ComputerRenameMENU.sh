@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 6-28-23   ###
-### Updated: 4-25-25   ###
-### Version: 2.5       ###
+### Created: 06-28-23  ###
+### Updated: 04-25-25  ###
+### Version: 2.6       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -90,7 +90,7 @@ function department_Prompt() {
         "MAR - Marketing & Communications", "MED - Medical School", "MM - Mission & Ministry",\
         "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
         "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art", "NEU - Neurology",\
-        "PATH - Pathology", "PAR - Parks College", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
+        "PATH - Pathology", "PAR - Parks College", "PEDS - Pediatrics", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
         "PHYS - Physics", "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
         "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
         "SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education",\
