@@ -21,7 +21,7 @@ function log_Message() {
 # Check if account exists
 function account_Check() {
     local account="$1"
-    /usr/bin/id "$account" >/dev/null;
+    /usr/bin/id "$account" >/dev/null
     return $?
 }
 
