@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-07-25  ###
-### Updated: 06-09-25  ###
-### Version: 1.3       ###
+### Updated: 06-24-25  ###
+### Version: 1.4       ###
 ##########################
 
 readonly logPath='/var/log/CyberArk_Update.log'
@@ -125,30 +125,34 @@ function main() {
     then
         log_Message "ERROR: Password change command failed"
         exit 1
+    else
+        log_Message "Password change command completed successfully"
     fi
-    log_Message "Password change command completed successfully"
 
     log_Message "Verifying password change"
     if ! verify_PassChange "$admin" "$new";
     then
         log_Message "ERROR: Password change verification failed"
         exit 1
+    else
+        log_Message "Password change verified successfully"
     fi
-    log_Message "Password change verified successfully"
 
     log_Message "Updating account keychain"
     if ! update_Keychain "$admin" "$old" "$new";
     then
         log_Message "ERROR: Keychain update failed"
+    else
+        log_Message "Account keychain updated"
     fi
-    log_Message "Account keychain updated"
 
     log_Message "Clearing password policy"
     if ! clear_PassPolicy "$admin";
     then
         log_Message "ERROR: Clear password policy failed"
+    else
+        log_Message "Password policy cleared"
     fi
-    log_Message "Password policy cleared"
 
     if [[ "$hasSecureToken" -eq 0 ]];
     then
