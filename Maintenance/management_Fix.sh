@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-04-25  ###
-### Version: 1.2       ###
+### Version: 1.3       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -12,6 +12,7 @@ readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents
 readonly dialogTitle='Management Fix'
 readonly logPath='/var/log/management_Fix.log'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+effectiveIconPath="$defaultIconPath"
 existingAdmin=false
 
 # Check if Jamf binary exists to determine which parameters to use
@@ -46,7 +47,6 @@ function arg_Check() {
 
 # Check for valid icon file, AppleScript dialog boxes will error without it
 function icon_Check() {
-    effectiveIconPath="$defaultIconPath"
     if [[ ! -f "$effectiveIconPath" ]];
     then
         log_Message "No SLU icon found"
@@ -152,14 +152,13 @@ function removeAccount_AdminGroup() {
         if ! admin_Check "$account";
         then
             log_Message "Permissions removed from $account"
-            return 0
         else
             return 1
         fi
     else
         log_Message "Leaving $account permissions"
-        return 0
     fi
+    return 0
 }
 
 # Change account password
@@ -191,32 +190,31 @@ function update_Keychain() {
     then
         if [[ -z "$oldPass" ]];
         then
-            log_Message "Old password unknown, deleting keychain"
+            log_Message "Deleting $account keychain"
             local backupPath="$userHome/Library/Keychains/login.keychain-db.backup.$(date +%Y%m%d%H%M%S)"
             /bin/cp "$keychainPath" "$backupPath" 2>/dev/null
             if /bin/rm -f "$keychainPath";
             then
-                log_Message "Successfully deleted keychain. New keychain will be created on next login"
+                log_Message "Successfully deleted $account keychain. New keychain will be created on next login"
             else
-                log_Message "Failed to delete keychain"
+                log_Message "Failed to delete $account keychain"
                 return 1
             fi
         else
             /usr/bin/security set-keychain-password -o "$oldPass" -p "$newPass" "$userHome/Library/Keychains/login.keychain-db" &>/dev/null
             if [[ $? -eq 0 ]];
             then
-                log_Message "Login keychain password updated successfully"
+                log_Message "$account login keychain password updated successfully"
             else
-                log_Message "Could not update login keychain, user may need to update manually"
+                log_Message "Could not update $account login keychain, may need to update manually"
                 /usr/bin/touch "$userHome/.keychain_update_required"
                 /usr/sbin/chown "$account" "$userHome/.keychain_update_required"
                 return 1
             fi
         fi
     else
-        log_Message "Login keychain not found, skipping keychain update"
+        log_Message "$account login keychain not found, skipping keychain update"
     fi
-
     return 0
 }
 
@@ -242,7 +240,7 @@ function reset_Password() {
         log_Message "Password change completed successfully"
     fi
 
-    log_Message "Verifying password change"
+    log_Message "Verifying password change for $account"
     if ! verify_Pass "$account" "$newPass";
     then
         log_Message "ERROR: Password change verification failed"
@@ -251,20 +249,19 @@ function reset_Password() {
         log_Message "Password change verified successfully"
     fi
 
-    log_Message "Updating account keychain"
+    log_Message "Updating keychain for $account"
     if ! update_Keychain "$account" "" "$newPass";
     then
         log_Message "ERROR: Keychain update failed"
     fi
 
-    log_Message "Clearing password policy"
+    log_Message "Clearing password policy for $account"
     if ! clear_PassPolicy "$account";
     then
         log_Message "ERROR: Clear password policy failed"
     else
         log_Message "Password policy cleared"
     fi
-
     return 0
 }
 
@@ -323,7 +320,7 @@ OOP
                 ;;
             '')
                 log_Message "Nothing entered in text field"
-                alert_Dialog "Please enter something."
+                alert_Dialog "Please enter something or select cancel."
                 ;;
             *)
                 if [[ "$dialogType" == 'hidden' ]];
@@ -371,13 +368,30 @@ OOP
 }
 
 # Check to delete temporary account before exiting
-function exit_Error() {
+function exit_Func() {
+    local type="$1"
+    mAccountPass=''
+    tAccountPass=''
+    currentUserPass=''
     if account_Check "$tAccountName";
     then
-        /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null
-        log_Message "Temporary account deleted"
+        if ! /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null;
+        then
+            log_Message "ERROR: $tAccountName not deleted"
+            exit 1
+        else
+            log_Message "$tAccountName deleted"
+        fi
     fi
-    exit 1
+
+    if [[ "$type" == 'error' ]];
+    then
+        log_Message "ERROR: Exiting"
+        exit 1
+    else
+        log_Message "Exiting!"
+        exit 0
+    fi
 }
 
 # Ensure $mAccountName is properly configured
@@ -405,10 +419,8 @@ function final_Check() {
     fi
     if [[ "$exists" == 1 ]] && [[ "$admin" == 1 ]] && [[ "$token" == 1 ]] && [[ "$pass" == 1 ]];
     then
-        log_Message "Process completed successfully!"
         return 0
     fi
-
     return 1
 }
 
@@ -418,14 +430,25 @@ function main() {
     arg_Check
     if ! account_Check "$tAccountName";
     then
-        log_Message "ERROR: Missing temporary account"
-        exit_Error
+        log_Message "ERROR: Missing $tAccountName"
+        exit_Func "error"
     fi
 
+    # Check for icon files for AppleScript dialog
     if ! icon_Check;
     then
         log_Message "ERROR: Missing SLU icon"
-        exit 1
+        exit_Func "error"
+    fi
+
+    # Ensure $mAccountName is not already properly configured
+    log_Message "Running pre-check for correct $mAccountName configuration"
+    if final_Check "$mAccountName";
+    then
+        log_Message "Pre-check passed"
+        exit_Func
+    else
+        log_Message "Pre-check failed, continuing with configuration of $mAccountName"
     fi
 
     # Ensure $mAccountName exists
@@ -438,7 +461,7 @@ function main() {
         if ! create_Account "$mAccountName" "$mAccountPass" "$mAccountPath" "$tAccountName" "$tAccountPass";
         then
             log_Message "ERROR: Failed to create $mAccountName"
-            exit_Error
+            exit_Func "error"
         fi
     fi
 
@@ -451,8 +474,8 @@ function main() {
         log_Message "$mAccountName is not an admin"
         if ! addAccount_AdminGroup "$mAccountName" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Unable to grant admin rights"
-            exit_Error
+            log_Message "ERROR: Unable to grant admin rights to $mAccountName"
+            exit_Func "error"
         else
             log_Message "$mAccountName is now an admin"
         fi
@@ -464,43 +487,37 @@ function main() {
     then
         log_Message "ERROR: $currentUser does not have a secure token"
         alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun SecureTokenManager policy to check Token status."
-        exit_Error
+        exit_Func "error"
     else
         log_Message "$currentUser has a secure token"
-    fi
-
-    # Prompt $currentUser for password
-    log_Message "Prompting $currentUser for password"
-    if ! textField_Dialog "Enter the password for $currentUser:" "hidden";
-    then
-        log_Message "Exiting at password prompt."
-        if account_Check "$tAccountName";
-        then
-            /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure
-            log_Message "Temporary account deleted"
-        fi
-        exit 0
-    else
-        currentUserPass="$textFieldDialog"
     fi
 
     # Check if $currentUser is already an admin
     log_Message "Checking permissions for $currentUser"
     if admin_Check "$currentUser";
     then
-        log_Message "$currentUser already an admin"
+        log_Message "$currentUser has proper permission"
         existingAdmin=true
     else
         if ! addAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Unable to grant admin rights"
-            currentUserPass=''
-            exit_Error
+            log_Message "ERROR: Unable to grant permissions to $currentUser"
+            exit_Func "error"
         fi
     fi
 
-    # Assign secure token to temporary account so that it can change $mAccountName password
-    log_Message "Assigning secure token to temporary account"
+    # Prompt $currentUser for password
+    log_Message "Prompting $currentUser for password"
+    if ! textField_Dialog "$currentUser has a secure token.\n\nEnter the password for $currentUser to continue:" "hidden";
+    then
+        log_Message "Exiting at password prompt"
+        exit_Func
+    else
+        currentUserPass="$textFieldDialog"
+    fi
+
+    # Assign secure token to $tAccountName so that it can change $mAccountName password
+    log_Message "Assigning secure token to $tAccountName"
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
         log_Message "ERROR: Unable to assign secure token to $tAccountName"
@@ -513,7 +530,7 @@ function main() {
             if ! reset_Password "$mAccountName" "$mAccountPass" "$tAccountName" "$tAccountPass";
             then
                 log_Message "ERROR: Exiting at password reset"
-                exit_Error
+                exit_Func "error"
             else
                 log_Message "Successfully reset $mAccountName password"
             fi
@@ -537,34 +554,28 @@ function main() {
             then
                 log_Message "Secure token assigned to $mAccountName"
             else
-                log_Message "ERROR: Secure token not assigned"
+                log_Message "ERROR: Secure token not assigned to $mAccountName"
             fi
         fi
     fi
     currentUserPass=''
 
     # Remove admin permission if necessary
-    log_Message "Removing permissions"
+    log_Message "Checking permissions for $currentUser"
     if ! removeAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
     then
-        log_Message "ERROR: Unable to remove permissions"
+        log_Message "ERROR: Unable to remove permissions from $currentUser"
     fi
 
     log_Message "Running final check"
     if final_Check "$mAccountName";
     then
-        if account_Check "$tAccountName";
-        then
-            /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure
-            log_Message "Temporary account deleted"
-        fi
+        log_Message "Final check passed"
+        exit_Func
     else
         log_Message "$mAccountName still misconfigured"
-        exit_Error
+        exit_Func "error"
     fi
-
-    log_Message "Exiting!"
-    exit 0
 }
 
 main
