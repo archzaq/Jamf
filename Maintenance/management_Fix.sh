@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-03-25  ###
-### Version: 1.0       ###
+### Updated: 07-04-25  ###
+### Version: 1.1       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -236,10 +236,10 @@ function reset_Password() {
     log_Message "Attempting to change password for $account"
     if ! change_Pass "$account" "$newPass" "$admin" "$adminPass";
     then
-        log_Message "ERROR: Password change command failed"
+        log_Message "ERROR: Password change failed"
         return 1
     else
-        log_Message "Password change command completed successfully"
+        log_Message "Password change completed successfully"
     fi
 
     log_Message "Verifying password change"
