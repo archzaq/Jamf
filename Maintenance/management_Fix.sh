@@ -510,7 +510,7 @@ function main() {
 
     # Prompt $currentUser for password
     log_Message "Prompting $currentUser for password"
-    if ! textField_Dialog "$currentUser has a secure token.\n\nEnter the password for $currentUser to continue:" "hidden";
+    if ! textField_Dialog "$currentUser has a secure token!\n\nEnter the password for $currentUser to continue:" "hidden";
     then
         log_Message "Exiting at password prompt"
         exit_Func
