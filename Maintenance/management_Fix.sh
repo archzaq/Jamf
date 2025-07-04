@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-04-25  ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -27,7 +27,6 @@ else
     readonly tAccountName="$3"
     readonly tAccountPass="$4"
 fi
-
 
 # Append current status to log file
 function log_Message() {
@@ -135,7 +134,7 @@ function addAccount_AdminGroup() {
     /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin &>/dev/null
     if admin_Check "$account";
     then
-        log_Message "Permissions granted"
+        log_Message "Permissions granted to $account"
         return 0
     else
         return 1
@@ -152,13 +151,13 @@ function removeAccount_AdminGroup() {
         /usr/sbin/dseditgroup -o edit -d "$account" -u "$admin" -P "$adminPass" -t user -L admin &>/dev/null
         if ! admin_Check "$account";
         then
-            log_Message "Permissions removed"
+            log_Message "Permissions removed from $account"
             return 0
         else
             return 1
         fi
     else
-        log_Message "Leaving user permissions"
+        log_Message "Leaving $account permissions"
         return 0
     fi
 }
@@ -228,6 +227,7 @@ function clear_PassPolicy() {
     return $?
 }
 
+# Change pass, verify pass, update keychain, and clear password policy
 function reset_Password() {
     local account="$1"
     local newPass="$2"
@@ -255,8 +255,6 @@ function reset_Password() {
     if ! update_Keychain "$account" "" "$newPass";
     then
         log_Message "ERROR: Keychain update failed"
-    else
-        log_Message "Account keychain updated"
     fi
 
     log_Message "Clearing password policy"
@@ -382,6 +380,7 @@ function exit_Error() {
     exit 1
 }
 
+# Ensure $mAccountName is properly configured
 function final_Check() {
     local account="$1"
     local exists=0
@@ -429,9 +428,7 @@ function main() {
         exit 1
     fi
 
-    ### BEGINNING ###
     # Ensure $mAccountName exists
-    # Create it, if not
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
     then
@@ -446,7 +443,7 @@ function main() {
     fi
 
     # Ensure $mAccountName is an admin
-    # Make it one, if not
+    log_Message "Checking permissions for $mAccountName"
     if admin_Check "$mAccountName";
     then
         log_Message "$mAccountName is an admin"
@@ -461,14 +458,19 @@ function main() {
         fi
     fi
 
-
+    # Ensure $currentUser has a secure token
+    log_Message "Checking $currentUser for secure token"
     if ! token_Check "$currentUser";
     then
         log_Message "ERROR: $currentUser does not have a secure token"
         alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun SecureTokenManager policy to check Token status."
         exit_Error
+    else
+        log_Message "$currentUser has a secure token"
     fi
 
+    # Prompt $currentUser for password
+    log_Message "Prompting $currentUser for password"
     if ! textField_Dialog "Enter the password for $currentUser:" "hidden";
     then
         log_Message "Exiting at password prompt."
@@ -482,8 +484,11 @@ function main() {
         currentUserPass="$textFieldDialog"
     fi
 
+    # Check if $currentUser is already an admin
+    log_Message "Checking permissions for $currentUser"
     if admin_Check "$currentUser";
     then
+        log_Message "$currentUser already an admin"
         existingAdmin=true
     else
         if ! addAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
@@ -495,11 +500,13 @@ function main() {
     fi
 
     # Assign secure token to temporary account so that it can change $mAccountName password
+    log_Message "Assigning secure token to temporary account"
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
         log_Message "ERROR: Unable to assign secure token to $tAccountName"
     else
         log_Message "Secure token assigned to $tAccountName"
+        log_Message "Checking $mAccountName password"
         if ! verify_Pass "$mAccountName" "$mAccountPass";
         then
             log_Message "$mAccountName password is incorrect"
@@ -516,7 +523,7 @@ function main() {
     fi
     
     # Ensure $mAccountName has secure token
-    # Grant one, if not, and if possible
+    log_Message "Checking $mAccountName for secure token"
     if token_Check "$mAccountName";
     then
         log_Message "$mAccountName has a secure token"
@@ -536,11 +543,14 @@ function main() {
     fi
     currentUserPass=''
 
+    # Remove admin permission if necessary
+    log_Message "Removing permissions"
     if ! removeAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
     then
-        log_Message "ERROR: Unable to remove admin rights"
+        log_Message "ERROR: Unable to remove permissions"
     fi
 
+    log_Message "Running final check"
     if final_Check "$mAccountName";
     then
         if account_Check "$tAccountName";
