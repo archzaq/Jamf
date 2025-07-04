@@ -19,14 +19,14 @@ existingAdmin=false
 if [[ -f "/usr/local/jamf/bin/jamf" ]];
 then
     readonly mAccountName="$4"
-    readonly mAccountPass="$5"
+    mAccountPass="$5"
     readonly tAccountName="$6"
-    readonly tAccountPass="$7"
+    tAccountPass="$7"
 else
     readonly mAccountName="$1"
-    readonly mAccountPass="$2"
+    mAccountPass="$2"
     readonly tAccountName="$3"
-    readonly tAccountPass="$4"
+    tAccountPass="$4"
 fi
 
 # Append current status to log file
@@ -40,7 +40,7 @@ function arg_Check() {
     if [[ -z "$mAccountName" ]] || [[ -z "$mAccountPass" ]] || [[ -z "$tAccountName" ]] || [[ -z "$tAccountPass" ]]; 
     then
         log_Message "ERROR: Missing critical arguments"
-        exit 1
+        exit_Func "error"
     fi
     readonly mAccountPath="/Users/${mAccountName}"
 }
@@ -231,7 +231,7 @@ function reset_Password() {
     local newPass="$2"
     local admin="$3"
     local adminPass="$4"
-    log_Message "Attempting to change password for $account"
+    log_Message "Changing password for $account"
     if ! change_Pass "$account" "$newPass" "$admin" "$adminPass";
     then
         log_Message "ERROR: Password change failed"
@@ -339,7 +339,7 @@ OOP
 # AppleScript - Create alert dialog window
 function alert_Dialog() {
     local promptString="$1"
-    log_Message "Displaying alert dialog."
+    log_Message "Displaying alert dialog"
     alertDialog=$(/usr/bin/osascript <<OOP
     try
         set promptString to "$promptString"
@@ -375,6 +375,7 @@ function exit_Func() {
     currentUserPass=''
     if account_Check "$tAccountName";
     then
+        log_Message "Deleting $tAccountName"
         if ! /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null;
         then
             log_Message "ERROR: $tAccountName not deleted"
@@ -427,7 +428,21 @@ function final_Check() {
 function main() {
     ### PRECHECK ###
     printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logPath"
+
+    # Ensure $mAccountName is not already properly configured
+    log_Message "Running pre-check for correct $mAccountName configuration"
+    if final_Check "$mAccountName";
+    then
+        log_Message "Pre-check passed"
+        exit_Func
+    else
+        log_Message "Pre-check failed, continuing with configuration of $mAccountName"
+    fi
+
+    # Check for required script parameters
     arg_Check
+
+    # Ensure $tAccountName exists
     if ! account_Check "$tAccountName";
     then
         log_Message "ERROR: Missing $tAccountName"
@@ -439,16 +454,6 @@ function main() {
     then
         log_Message "ERROR: Missing SLU icon"
         exit_Func "error"
-    fi
-
-    # Ensure $mAccountName is not already properly configured
-    log_Message "Running pre-check for correct $mAccountName configuration"
-    if final_Check "$mAccountName";
-    then
-        log_Message "Pre-check passed"
-        exit_Func
-    else
-        log_Message "Pre-check failed, continuing with configuration of $mAccountName"
     fi
 
     # Ensure $mAccountName exists
