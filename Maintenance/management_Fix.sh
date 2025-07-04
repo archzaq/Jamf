@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-04-25  ###
-### Version: 1.3       ###
+### Version: 1.4       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -398,29 +398,26 @@ function exit_Func() {
 # Ensure $mAccountName is properly configured
 function final_Check() {
     local account="$1"
-    local exists=0
-    local admin=0
-    local token=0
-    local pass=0
     if account_Check "$account";
     then
-        exists=1
-    fi
-    if admin_Check "$account";
-    then
-        admin=1
-    fi
-    if token_Check "$account";
-    then
-        token=1
-    fi
-    if verify_Pass "$mAccountName" "$mAccountPass";
-    then
-        pass=1
-    fi
-    if [[ "$exists" == 1 ]] && [[ "$admin" == 1 ]] && [[ "$token" == 1 ]] && [[ "$pass" == 1 ]];
-    then
-        return 0
+        if admin_Check "$account";
+        then
+            if token_Check "$account";
+            then
+                if verify_Pass "$mAccountName" "$mAccountPass";
+                then
+                    return 0
+                else
+                    log_Message "$account password is incorrect"
+                fi
+            else
+                log_Message "$account does not have a secure token"
+            fi
+        else
+            log_Message "$account is not an admin"
+        fi
+    else
+        log_Message "$account does not exist"
     fi
     return 1
 }
@@ -433,7 +430,7 @@ function main() {
     log_Message "Running pre-check for correct $mAccountName configuration"
     if final_Check "$mAccountName";
     then
-        log_Message "Pre-check passed"
+        log_Message "Pre-check passed!"
         exit_Func
     else
         log_Message "Pre-check failed, continuing with configuration of $mAccountName"
@@ -575,7 +572,7 @@ function main() {
     log_Message "Running final check"
     if final_Check "$mAccountName";
     then
-        log_Message "Final check passed"
+        log_Message "Final check passed!"
         exit_Func
     else
         log_Message "$mAccountName still misconfigured"
