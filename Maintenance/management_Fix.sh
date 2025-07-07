@@ -135,7 +135,6 @@ function addAccount_AdminGroup() {
     /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin &>/dev/null
     if admin_Check "$account";
     then
-        log_Message "Permissions granted to $account"
         return 0
     else
         return 1
@@ -150,10 +149,8 @@ function removeAccount_AdminGroup() {
     if [ "$existingAdmin" != true ];
     then
         /usr/sbin/dseditgroup -o edit -d "$account" -u "$admin" -P "$adminPass" -t user -L admin &>/dev/null
-        if ! admin_Check "$account";
+        if admin_Check "$account";
         then
-            log_Message "Permissions removed from $account"
-        else
             return 1
         fi
     else
