@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-06-25  ###
-### Version: 1.6       ###
+### Updated: 07-07-25  ###
+### Version: 1.7       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -126,7 +126,7 @@ function create_Account() {
     fi
 }
 
-# Add user to admin group
+# Add account to admin group
 function addAccount_AdminGroup() {
     local account="$1"
     local adminAccount="$2"
@@ -141,7 +141,7 @@ function addAccount_AdminGroup() {
     fi
 }
 
-# Remove user from admin group
+# Remove account from admin group
 function removeAccount_AdminGroup() {
     local account="$1"
     local admin="$2"
@@ -265,7 +265,7 @@ function reset_Password() {
     return 0
 }
 
-# Assigns Secure Token to current user using $mAccountName
+# Assigns Secure Token to an account
 function assign_Token(){
     local adminAccount="$1"
     local adminPassword="$2"
@@ -367,7 +367,7 @@ OOP
     esac
 }
 
-# Monitor for sudo commands run by $currentUser during vunerable moments
+# Monitor for sudo commands run by an account during vulnerable moments
 function monitor() {
     local user="$1"
     local endTime=$(($(date +%s) + $2))
@@ -419,6 +419,8 @@ function final_Check() {
 }
 
 # Check to delete temporary account before exiting
+# Ensure monitor is killed
+# Clear variables from memory
 function exit_Func() {
     local type="$1"
     if [[ "$precheckComplete" == true ]];
@@ -495,6 +497,13 @@ function main() {
 
     # Check for required script parameters
     arg_Check
+
+    # Ensure $currentUser is not $mAccountName
+    if [[ "$currentUser" == "$mAccountName" ]];
+    then
+        log_Message "Logged in as $mAccountName"
+        alert_Dialog "Please login with an account other than $mAccountName"
+    fi
 
     # Ensure $tAccountName exists
     if ! account_Check "$tAccountName";
