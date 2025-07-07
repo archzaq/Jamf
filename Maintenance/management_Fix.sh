@@ -377,11 +377,11 @@ function monitor() {
         do
             if ps -p "$sudoPID" -o ruser= | grep "$user" &>/dev/null;
             then
-                log_Message "SUDO USED BY $user"
-                log_Message "Killing $sudoPID"
+                log_Message "Security: SUDO USED BY $user"
+                log_Message "Security: Killing $sudoPID"
                 if kill -9 "$sudoPID" &>/dev/null;
                 then
-                    log_Message "Successfully killed $sudoPID"
+                    log_Message "Security: Successfully killed $sudoPID"
                 else
                     log_Message "ERROR: Unable to kill $sudoPID"
                 fi
