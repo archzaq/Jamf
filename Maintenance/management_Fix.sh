@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-07-25  ###
-### Version: 1.7       ###
+### Version: 1.8       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -15,6 +15,7 @@ readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | a
 effectiveIconPath="$defaultIconPath"
 existingAdmin=false
 precheckComplete=false
+trapExecuted=false
 monitorPID=''
 
 # Check if Jamf binary exists to determine which parameters to use
@@ -368,7 +369,7 @@ OOP
 }
 
 # Monitor for sudo commands run by an account during vulnerable moments
-function monitor() {
+function monitor_Commands() {
     local user="$1"
     local endTime=$(($(date +%s) + $2))
     while [[ $(date +%s) -lt $endTime ]];
@@ -387,7 +388,7 @@ function monitor() {
                 fi
             fi
         done
-        sleep 0.05
+        sleep 0.1
     done
 }
 
@@ -423,6 +424,12 @@ function final_Check() {
 # Clear variables from memory
 function exit_Func() {
     local type="$1"
+    if [[ "$trapExecuted" == true ]];
+    then
+        return
+    fi
+    trapExecuted=true
+
     if [[ "$precheckComplete" == true ]];
     then
         log_Message "Checking permissions for $currentUser"
@@ -435,15 +442,15 @@ function exit_Func() {
         then
             if ps "$monitorPID" &>/dev/null;
             then
-                log_Message "Killing monitor"
+                log_Message "Security: Killing monitor"
                 if kill "$monitorPID" &>/dev/null;
                 then
-                    log_Message "Monitor killed"
+                    log_Message "Security: Monitor killed"
                 else
                     log_Message "ERROR: Monitor not killed. Kill $monitorPID in Activity Monitor"
                 fi
             else
-                log_Message "Monitor PID not found, already exited"
+                log_Message "Security: Monitor PID not found, already exited"
             fi
         fi
     fi
@@ -458,7 +465,6 @@ function exit_Func() {
         if ! /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null;
         then
             log_Message "ERROR: $tAccountName not deleted"
-            exit 1
         else
             log_Message "$tAccountName deleted"
         fi
@@ -477,6 +483,7 @@ function exit_Func() {
 function main() {
     ### PRECHECK ###
     trap "exit_Func" EXIT
+    trap 'log_Message "ERROR: Script interrupt"; exit_Func error' INT TERM
     printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logPath"
 
     # Check this first for proper removal of permissions on exit
@@ -503,6 +510,7 @@ function main() {
     then
         log_Message "Logged in as $mAccountName"
         alert_Dialog "Please login with an account other than $mAccountName"
+        exit_Func "error"
     fi
 
     # Ensure $tAccountName exists
@@ -579,7 +587,7 @@ function main() {
     then
         log_Message "$currentUser has proper permission"
     else
-        monitor "$currentUser" "25" &
+        monitor_Commands "$currentUser" "25" &
         monitorPID=$!
         if ! addAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
         then
