@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-04-25  ###
-### Version: 1.4       ###
+### Updated: 07-06-25  ###
+### Version: 1.6       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -14,6 +14,8 @@ readonly logPath='/var/log/management_Fix.log'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 effectiveIconPath="$defaultIconPath"
 existingAdmin=false
+precheckComplete=false
+monitorPID=''
 
 # Check if Jamf binary exists to determine which parameters to use
 if [[ -f "/usr/local/jamf/bin/jamf" ]];
@@ -68,8 +70,6 @@ function icon_Check() {
                 return 1
             fi
         fi
-    else
-        log_Message "SLU icon found"
     fi
     return 0
 }
@@ -88,7 +88,7 @@ function admin_Check(){
     return $?
 }
 
-# Check account for secure token
+# Check account for Secure Token
 function token_Check() {
     local account="$1"
     /usr/sbin/sysadminctl -secureTokenStatus "$account" 2>&1 | grep -q 'ENABLED'
@@ -265,7 +265,7 @@ function reset_Password() {
     return 0
 }
 
-# Assigns secure token to current user using $mAccountName
+# Assigns Secure Token to current user using $mAccountName
 function assign_Token(){
     local adminAccount="$1"
     local adminPassword="$2"
@@ -367,12 +367,89 @@ OOP
     esac
 }
 
+# Monitor for sudo commands run by $currentUser during vunerable moments
+function monitor() {
+    local user="$1"
+    local endTime=$(($(date +%s) + $2))
+    while [[ $(date +%s) -lt $endTime ]];
+    do
+        for sudoPID in $(pgrep -u "root" "sudo" 2>/dev/null);
+        do
+            if ps -p "$sudoPID" -o ruser= | grep "$user" &>/dev/null;
+            then
+                log_Message "SUDO USED BY $user"
+                log_Message "Killing $sudoPID"
+                if kill -9 "$sudoPID" &>/dev/null;
+                then
+                    log_Message "Successfully killed $sudoPID"
+                else
+                    log_Message "ERROR: Unable to kill $sudoPID"
+                fi
+            fi
+        done
+        sleep 0.05
+    done
+}
+
+# Ensure $mAccountName is properly configured
+function final_Check() {
+    local account="$1"
+    if account_Check "$account";
+    then
+        if admin_Check "$account";
+        then
+            if token_Check "$account";
+            then
+                if verify_Pass "$mAccountName" "$mAccountPass";
+                then
+                    return 0
+                else
+                    log_Message "$account password is incorrect"
+                fi
+            else
+                log_Message "$account does not have a Secure Token"
+            fi
+        else
+            log_Message "$account is not an admin"
+        fi
+    else
+        log_Message "$account does not exist"
+    fi
+    return 1
+}
+
 # Check to delete temporary account before exiting
 function exit_Func() {
     local type="$1"
+    if [[ "$precheckComplete" == true ]];
+    then
+        log_Message "Checking permissions for $currentUser"
+        if ! removeAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
+        then
+            log_Message "ERROR: Unable to remove permissions from $currentUser"
+        fi
+
+        if [[ -n "$monitorPID" ]];
+        then
+            if ps "$monitorPID" &>/dev/null;
+            then
+                log_Message "Killing monitor"
+                if kill "$monitorPID" &>/dev/null;
+                then
+                    log_Message "Monitor killed"
+                else
+                    log_Message "ERROR: Monitor not killed. Kill $monitorPID in Activity Monitor"
+                fi
+            else
+                log_Message "Monitor PID not found, already exited"
+            fi
+        fi
+    fi
+
     mAccountPass=''
     tAccountPass=''
     currentUserPass=''
+    
     if account_Check "$tAccountName";
     then
         log_Message "Deleting $tAccountName"
@@ -395,36 +472,16 @@ function exit_Func() {
     fi
 }
 
-# Ensure $mAccountName is properly configured
-function final_Check() {
-    local account="$1"
-    if account_Check "$account";
-    then
-        if admin_Check "$account";
-        then
-            if token_Check "$account";
-            then
-                if verify_Pass "$mAccountName" "$mAccountPass";
-                then
-                    return 0
-                else
-                    log_Message "$account password is incorrect"
-                fi
-            else
-                log_Message "$account does not have a secure token"
-            fi
-        else
-            log_Message "$account is not an admin"
-        fi
-    else
-        log_Message "$account does not exist"
-    fi
-    return 1
-}
-
 function main() {
     ### PRECHECK ###
+    trap "exit_Func" EXIT
     printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logPath"
+
+    # Check this first for proper removal of permissions on exit
+    if admin_Check "$currentUser";
+    then
+        existingAdmin=true
+    fi
 
     # Ensure $mAccountName is not already properly configured
     log_Message "Running pre-check for correct $mAccountName configuration"
@@ -453,6 +510,8 @@ function main() {
         exit_Func "error"
     fi
 
+    ### START ###
+    precheckComplete=true
     # Ensure $mAccountName exists
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
@@ -483,15 +542,26 @@ function main() {
         fi
     fi
 
-    # Ensure $currentUser has a secure token
-    log_Message "Checking $currentUser for secure token"
+    # Ensure $currentUser has a Secure Token
+    log_Message "Checking $currentUser for Secure Token"
     if ! token_Check "$currentUser";
     then
-        log_Message "ERROR: $currentUser does not have a secure token"
+        log_Message "ERROR: $currentUser does not have a Secure Token"
         alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun SecureTokenManager policy to check Token status."
         exit_Func "error"
     else
-        log_Message "$currentUser has a secure token"
+        log_Message "$currentUser has a Secure Token"
+    fi
+
+    # Prompt $currentUser for password
+    log_Message "Prompting $currentUser for password"
+    if ! textField_Dialog "$currentUser has a Secure Token!\n\nEnter the password for $currentUser to grant $mAccountName a Secure Token:" "hidden";
+    then
+        log_Message "Exiting at password prompt"
+        exit_Func
+    else
+        currentUserPass="$textFieldDialog"
+        textFieldDialog=''
     fi
 
     # Check if $currentUser is already an admin
@@ -499,8 +569,9 @@ function main() {
     if admin_Check "$currentUser";
     then
         log_Message "$currentUser has proper permission"
-        existingAdmin=true
     else
+        monitor "$currentUser" "25" &
+        monitorPID=$!
         if ! addAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
         then
             log_Message "ERROR: Unable to grant permissions to $currentUser"
@@ -508,23 +579,13 @@ function main() {
         fi
     fi
 
-    # Prompt $currentUser for password
-    log_Message "Prompting $currentUser for password"
-    if ! textField_Dialog "$currentUser has a secure token!\n\nEnter the password for $currentUser to continue:" "hidden";
-    then
-        log_Message "Exiting at password prompt"
-        exit_Func
-    else
-        currentUserPass="$textFieldDialog"
-    fi
-
-    # Assign secure token to $tAccountName so that it can change $mAccountName password
-    log_Message "Assigning secure token to $tAccountName"
+    # Assign Secure Token to $tAccountName so that it can change $mAccountName password
+    log_Message "Assigning Secure Token to $tAccountName"
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
-        log_Message "ERROR: Unable to assign secure token to $tAccountName"
+        log_Message "ERROR: Unable to assign Secure Token to $tAccountName"
     else
-        log_Message "Secure token assigned to $tAccountName"
+        log_Message "Secure Token assigned to $tAccountName"
         log_Message "Checking $mAccountName password"
         if ! verify_Pass "$mAccountName" "$mAccountPass";
         then
@@ -541,33 +602,26 @@ function main() {
         fi
     fi
     
-    # Ensure $mAccountName has secure token
-    log_Message "Checking $mAccountName for secure token"
+    # Ensure $mAccountName has Secure Token
+    log_Message "Checking $mAccountName for Secure Token"
     if token_Check "$mAccountName";
     then
-        log_Message "$mAccountName has a secure token"
+        log_Message "$mAccountName has a Secure Token"
     else
-        log_Message "$mAccountName does not have a secure token"
+        log_Message "$mAccountName does not have a Secure Token"
         if ! assign_Token "$currentUser" "$currentUserPass" "$mAccountName" "$mAccountPass";
         then
-            log_Message "ERROR: Unable to assign secure token to $mAccountName"
+            log_Message "ERROR: Unable to assign Secure Token to $mAccountName"
         else
             if token_Check "$mAccountName";
             then
-                log_Message "Secure token assigned to $mAccountName"
+                log_Message "Secure Token assigned to $mAccountName"
             else
-                log_Message "ERROR: Secure token not assigned to $mAccountName"
+                log_Message "ERROR: Secure Token not assigned to $mAccountName"
             fi
         fi
     fi
     currentUserPass=''
-
-    # Remove admin permission if necessary
-    log_Message "Checking permissions for $currentUser"
-    if ! removeAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
-    then
-        log_Message "ERROR: Unable to remove permissions from $currentUser"
-    fi
 
     log_Message "Running final check"
     if final_Check "$mAccountName";
