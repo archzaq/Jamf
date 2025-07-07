@@ -483,7 +483,7 @@ function exit_Func() {
 function main() {
     ### PRECHECK ###
     trap "exit_Func" EXIT
-    trap 'log_Message "ERROR: Script interrupt"; exit_Func error' INT TERM
+    trap 'log_Message "ERROR: Script interrupt"; exit_Func "error"' INT TERM
     printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logPath"
 
     # Check this first for proper removal of permissions on exit
