@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-08-25  ###
-### Version: 1.10      ###
+### Version: 1.11      ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -234,8 +234,6 @@ function reset_Pass() {
     then
         log_Message "ERROR: INFO change failed"
         return 1
-    else
-        log_Message "INFO change completed successfully"
     fi
 
     log_Message "Verifying INFO change for $account"
@@ -527,6 +525,7 @@ function main() {
 
     ### START ###
     precheckComplete=true
+    osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
     # Ensure $mAccountName exists
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
