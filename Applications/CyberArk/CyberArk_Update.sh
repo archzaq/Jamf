@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-07-25  ###
-### Updated: 06-24-25  ###
-### Version: 1.4       ###
+### Updated: 07-08-25  ###
+### Version: 1.5       ###
 ##########################
 
 readonly logPath='/var/log/CyberArk_Update.log'
@@ -38,8 +38,15 @@ function change_Pass() {
     local newPass="$2"
     local adminAccount="$3"
     local oldPass="$4"
-    /usr/sbin/sysadminctl -resetPasswordFor "$account" -newPassword "$newPass" -adminUser "$adminAccount" -adminPassword "$oldPass" 2>&1
-    return $?
+    local output
+    output=$(/usr/sbin/sysadminctl -resetPasswordFor "$account" -newPassword "$newPass" -adminUser "$adminAccount" -adminPassword "$oldPass" 2>&1)
+    if verify_PassChange "$account" "$newPass";
+    then
+        return 0
+    else
+        log_Message "ERROR: Change failed, sysadminctl output: $output"
+        return 1
+    fi
 }
 
 # Verify password was changed properly
@@ -120,22 +127,23 @@ function main() {
         hasSecureToken=1
     fi
 
+    log_Message "Checking for current $admin password"
+    if ! verify_PassChange "$admin" "$old";
+    then
+        log_Message "ERROR: Old password not properly set"
+        log_Message "Run the following policy to resolve password issues: /usr/local/bin/jamf policy -event managementFix"
+        exit 1
+    else
+        log_Message "Old password properly set"
+    fi
+
     log_Message "Attempting to change password for $admin"
     if ! change_Pass "$admin" "$new" "$admin" "$old";
     then
         log_Message "ERROR: Password change command failed"
         exit 1
     else
-        log_Message "Password change command completed successfully"
-    fi
-
-    log_Message "Verifying password change"
-    if ! verify_PassChange "$admin" "$new";
-    then
-        log_Message "ERROR: Password change verification failed"
-        exit 1
-    else
-        log_Message "Password change verified successfully"
+        log_Message "Password change command completed"
     fi
 
     log_Message "Updating account keychain"
