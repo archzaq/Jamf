@@ -9,6 +9,7 @@
 
 readonly logPath='/var/log/CyberArk_Update.log'
 readonly admin="$4"
+hasSecureToken=1
 old="$5"
 new="$6"
 
@@ -40,7 +41,7 @@ function change_Pass() {
     local oldPass="$4"
     local output
     output=$(/usr/sbin/sysadminctl -resetPasswordFor "$account" -newPassword "$newPass" -adminUser "$adminAccount" -adminPassword "$oldPass" 2>&1)
-    if verify_PassChange "$account" "$newPass";
+    if verify_Pass "$account" "$newPass";
     then
         return 0
     else
@@ -50,7 +51,7 @@ function change_Pass() {
 }
 
 # Verify password was changed properly
-function verify_PassChange() {
+function verify_Pass() {
     local account="$1"
     local newPass="$2"
     /usr/bin/dscl . -authonly "$account" "$newPass" &>/dev/null
@@ -124,14 +125,15 @@ function main() {
         hasSecureToken=0
     else
         log_Message "Secure Token currently Disabled for $admin"
-        hasSecureToken=1
+        log_Message "Run the following command to resolve: sudo jamf policy -event managementFix"
+        exit 1
     fi
 
     log_Message "Checking for current $admin password"
-    if ! verify_PassChange "$admin" "$old";
+    if ! verify_Pass "$admin" "$old";
     then
         log_Message "ERROR: Old password not properly set"
-        log_Message "Run the following policy to resolve password issues: /usr/local/bin/jamf policy -event managementFix"
+        log_Message "Run the following command to resolve password issues with $admin: sudo jamf policy -event managementFix"
         exit 1
     else
         log_Message "Old password properly set"
