@@ -492,7 +492,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Pre-check passed!"
-        osascript -e 'display dialog "'"$mAccountName"' already properly configured!\n\nExiting!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
+        /usr/bin/osascript -e 'display dialog "'"$mAccountName"' already properly configured!\n\nExiting!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
         exit_Func
     else
         log_Message "Pre-check failed, continuing with configuration of $mAccountName"
@@ -525,7 +525,7 @@ function main() {
 
     ### START ###
     precheckComplete=true
-    osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
+    /usr/bin/osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
     # Ensure $mAccountName exists
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
@@ -641,7 +641,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Final check passed!"
-        osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
+        /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
         exit_Func
     else
         log_Message "$mAccountName still misconfigured"
