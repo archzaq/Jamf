@@ -163,10 +163,17 @@ function removeAccount_AdminGroup() {
 function change_Pass() {
     local account="$1"
     local newPass="$2"
-    local admin="$3"
-    local adminPass="$4"
-    /usr/sbin/sysadminctl -resetPasswordFor "$account" -newPassword "$newPass" -adminUser "$admin" -adminPassword "$adminPass" &>/dev/null
-    return $?
+    local adminAccount="$3"
+    local oldPass="$4"
+    local output
+    output=$(/usr/sbin/sysadminctl -resetPasswordFor "$account" -newPassword "$newPass" -adminUser "$adminAccount" -adminPassword "$oldPass" 2>&1)
+    if verify_Pass "$account" "$newPass";
+    then
+        return 0
+    else
+        log_Message "ERROR: Change failed, sysadminctl output: $output"
+        return 1
+    fi
 }
 
 # Verify password was changed properly
@@ -236,7 +243,6 @@ function reset_Pass() {
         return 1
     fi
 
-    log_Message "Verifying INFO change for $account"
     if ! verify_Pass "$account" "$newPass";
     then
         log_Message "ERROR: INFO change verification failed"
@@ -598,6 +604,7 @@ function main() {
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
         log_Message "ERROR: Unable to assign Secure Token to $tAccountName"
+        exit_Func "error"
     else
         log_Message "Secure Token assigned to $tAccountName"
         log_Message "Checking $mAccountName INFO"
