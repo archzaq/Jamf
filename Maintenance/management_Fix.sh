@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 07-07-25  ###
-### Version: 1.8       ###
+### Version: 1.9       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -385,7 +385,7 @@ function monitor_Commands() {
                 fi
             fi
         done
-        sleep 0.1
+        sleep 0.05
     done
 }
 
@@ -494,6 +494,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Pre-check passed!"
+        osascript -e 'display dialog "'"$mAccountName"' already properly configured!\n\nExiting!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
         exit_Func
     else
         log_Message "Pre-check failed, continuing with configuration of $mAccountName"
@@ -641,6 +642,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Final check passed!"
+        osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
         exit_Func
     else
         log_Message "$mAccountName still misconfigured"
