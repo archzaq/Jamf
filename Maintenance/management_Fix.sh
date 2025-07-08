@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-07-25  ###
-### Version: 1.9       ###
+### Updated: 07-08-25  ###
+### Version: 1.10      ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -102,8 +102,8 @@ function create_Account() {
     local accountAddPass="$2"
     local accountAddPath="$3"
     local adminAccount="$4"
-    local adminPassword="$5"
-    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPassword" &>/dev/null;
+    local adminPass="$5"
+    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPass" &>/dev/null;
     then
         log_Message "$accountAdd created"
         if account_Check "$accountAdd";
@@ -131,8 +131,8 @@ function create_Account() {
 function addAccount_AdminGroup() {
     local account="$1"
     local adminAccount="$2"
-    local adminPassword="$3"
-    /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPassword" -t user -L admin &>/dev/null
+    local adminPass="$3"
+    /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPass" -t user -L admin &>/dev/null
     if admin_Check "$account";
     then
         return 0
@@ -202,7 +202,7 @@ function update_Keychain() {
             /usr/bin/security set-keychain-password -o "$oldPass" -p "$newPass" "$userHome/Library/Keychains/login.keychain-db" &>/dev/null
             if [[ $? -eq 0 ]];
             then
-                log_Message "$account login keychain password updated successfully"
+                log_Message "$account login keychain INFO updated successfully"
             else
                 log_Message "Could not update $account login keychain, may need to update manually"
                 /usr/bin/touch "$userHome/.keychain_update_required"
@@ -224,27 +224,27 @@ function clear_PassPolicy() {
 }
 
 # Change pass, verify pass, update keychain, and clear password policy
-function reset_Password() {
+function reset_Pass() {
     local account="$1"
     local newPass="$2"
     local admin="$3"
     local adminPass="$4"
-    log_Message "Changing password for $account"
+    log_Message "Changing INFO for $account"
     if ! change_Pass "$account" "$newPass" "$admin" "$adminPass";
     then
-        log_Message "ERROR: Password change failed"
+        log_Message "ERROR: INFO change failed"
         return 1
     else
-        log_Message "Password change completed successfully"
+        log_Message "INFO change completed successfully"
     fi
 
-    log_Message "Verifying password change for $account"
+    log_Message "Verifying INFO change for $account"
     if ! verify_Pass "$account" "$newPass";
     then
-        log_Message "ERROR: Password change verification failed"
+        log_Message "ERROR: INFO change verification failed"
         return 1
     else
-        log_Message "Password change verified successfully"
+        log_Message "INFO change successfully verified"
     fi
 
     log_Message "Updating keychain for $account"
@@ -253,12 +253,12 @@ function reset_Password() {
         log_Message "ERROR: Keychain update failed"
     fi
 
-    log_Message "Clearing password policy for $account"
+    log_Message "Clearing INFO policy for $account"
     if ! clear_PassPolicy "$account";
     then
-        log_Message "ERROR: Clear password policy failed"
+        log_Message "ERROR: Clear INFO policy failed"
     else
-        log_Message "Password policy cleared"
+        log_Message "INFO policy cleared"
     fi
     return 0
 }
@@ -266,10 +266,10 @@ function reset_Password() {
 # Assigns Secure Token to an account
 function assign_Token(){
     local adminAccount="$1"
-    local adminPassword="$2"
+    local adminPass="$2"
     local tokenEnableAccount="$3"
-    local tokenEnablePassword="$4"
-    /usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPassword" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePassword" &>/dev/null
+    local tokenEnablePass="$4"
+    /usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPass" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePass" &>/dev/null
     if token_Check "$tokenEnableAccount";
     then
         return 0
@@ -323,7 +323,7 @@ OOP
             *)
                 if [[ "$dialogType" == 'hidden' ]];
                 then
-                    log_Message "Password entered"
+                    log_Message "Continued"
                 else
                     log_Message "User responded with: $textFieldDialog"
                 fi
@@ -568,11 +568,11 @@ function main() {
         log_Message "$currentUser has a Secure Token"
     fi
 
-    # Prompt $currentUser for password
-    log_Message "Prompting $currentUser for password"
+    # Prompt $currentUser for INFO
+    log_Message "Prompting $currentUser for INFO"
     if ! textField_Dialog "$currentUser has a Secure Token!\n\nEnter the password for $currentUser to grant $mAccountName a Secure Token:" "hidden";
     then
-        log_Message "Exiting at password prompt"
+        log_Message "Exiting at INFO prompt"
         exit_Func
     else
         currentUserPass="$textFieldDialog"
@@ -594,26 +594,26 @@ function main() {
         fi
     fi
 
-    # Assign Secure Token to $tAccountName so that it can change $mAccountName password
+    # Assign Secure Token to $tAccountName so that it can change $mAccountName INFO
     log_Message "Assigning Secure Token to $tAccountName"
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
         log_Message "ERROR: Unable to assign Secure Token to $tAccountName"
     else
         log_Message "Secure Token assigned to $tAccountName"
-        log_Message "Checking $mAccountName password"
+        log_Message "Checking $mAccountName INFO"
         if ! verify_Pass "$mAccountName" "$mAccountPass";
         then
-            log_Message "$mAccountName password is incorrect"
-            if ! reset_Password "$mAccountName" "$mAccountPass" "$tAccountName" "$tAccountPass";
+            log_Message "$mAccountName INFO is incorrect"
+            if ! reset_Pass "$mAccountName" "$mAccountPass" "$tAccountName" "$tAccountPass";
             then
-                log_Message "ERROR: Exiting at password reset"
+                log_Message "ERROR: Exiting at INFO reset"
                 exit_Func "error"
             else
-                log_Message "Successfully reset $mAccountName password"
+                log_Message "Successfully reset $mAccountName INFO"
             fi
         else
-            log_Message "$mAccountName password is correct"
+            log_Message "$mAccountName INFO is correct"
         fi
     fi
     
