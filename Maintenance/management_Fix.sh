@@ -273,11 +273,13 @@ function assign_Token(){
     local adminPass="$2"
     local tokenEnableAccount="$3"
     local tokenEnablePass="$4"
-    /usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPass" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePass" &>/dev/null
+    local output
+    output=$(/usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPass" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePass" 2>&1)
     if token_Check "$tokenEnableAccount";
     then
         return 0
     else
+        log_Message "ERROR: Change failed, sysadminctl output: $output"
         return 1
     fi
 }
@@ -531,7 +533,7 @@ function main() {
 
     ### START ###
     precheckComplete=true
-    /usr/bin/osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
+    /usr/bin/osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password." buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
     # Ensure $mAccountName exists
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
