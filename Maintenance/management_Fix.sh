@@ -3,13 +3,13 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-08-25  ###
-### Version: 1.11      ###
+### Updated: 07-10-25  ###
+### Version: 1.12      ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
-readonly dialogTitle='Management Fix'
+readonly dialogTitle='Management Account Fix'
 readonly logPath='/var/log/management_Fix.log'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 effectiveIconPath="$defaultIconPath"
@@ -569,7 +569,7 @@ function main() {
     if ! token_Check "$currentUser";
     then
         log_Message "ERROR: $currentUser does not have a Secure Token"
-        alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun SecureTokenManager policy to check Token status."
+        alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun 'sudo jamf policy -event SecureTokenManager' to check Token status."
         exit_Func "error"
     else
         log_Message "$currentUser has a Secure Token"
@@ -577,7 +577,7 @@ function main() {
 
     # Prompt $currentUser for INFO
     log_Message "Prompting $currentUser for INFO"
-    if ! textField_Dialog "$currentUser has a Secure Token!\n\nEnter the password for $currentUser to grant $mAccountName a Secure Token:" "hidden";
+    if ! textField_Dialog "$currentUser has a Secure Token!\n\nEnter the password for $currentUser to grant a Secure Token to $mAccountName:" "hidden";
     then
         log_Message "Exiting at INFO prompt"
         exit_Func
