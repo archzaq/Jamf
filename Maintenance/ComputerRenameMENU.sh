@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-28-23  ###
-### Updated: 06-09-25  ###
-### Version: 2.6       ###
+### Updated: 07-15-25  ###
+### Version: 2.7       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -80,7 +80,7 @@ function department_Prompt() {
         "BIO - Biology", "BIOC - Biochemistry", "CADE - Center for Advanced Dental Education", "CASE - Ctr for Anatomical Science & Ed-Administration",\
         "CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry",\
         "CME - Continuing Medical Education(PAWS)", "CMM - Communications", "COMPMED - Comparative Medicine ",\
-        "CSB - Cook School of Business","CSD - Speech, Language, and Hearing Sciences", "CTO - Clinical Trial Office",\
+        "CSB - Cook School of Business","CSD - Speech, Language, and Hearing Sciences", "CTO - Clinical Trial Office", "CWOD - Ctr for Workforce & Org Development",\
         "DPS - Department of Public Safety", "DUR - University Development","FPA - Fine & Performing Arts",\
         "EAS - Earth and Atmospheric Science", "EM - Enrollment Management", "ENG - English",\
         "EU - Clinical Skill", "EVT - Event Services", "FAC - Facilities",\
