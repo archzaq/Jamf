@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 1-30-25   ###
-### Updated: 4-16-25   ###
-### Version: 1.7       ###
+### Created: 01-30-25  ###
+### Updated: 07-15-25  ###
+### Version: 1.8       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -16,6 +16,13 @@ readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resour
 readonly finderIconPath="${iconPath}/FinderIcon.icns"
 readonly dialogTitle='File Search'
 readonly logPath='/var/log/fileSearch.log'
+quickSearchActivated=0
+fileCount=0
+
+# Append current status to log file
+function log_Message() {
+    printf "Log: $(date "+%F %T") %s\n" "$1"
+}
 
 # AppleScript - Ask user for search filter
 function first_Dialog() {
@@ -40,14 +47,14 @@ OOP
         )
         case "$firstDialog" in
             'cancelled')
-                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                log_Message "User selected cancel"
                 return 1
                 ;;
             '')
-                echo "Log: $(date "+%F %T") No response, re-prompting" | tee -a "$logPath"
+                log_Message "No response, re-prompting"
                 ;;
             *)
-                echo "Log: $(date "+%F %T") User responded with: $firstDialog" | tee -a "$logPath"
+                log_Message "User responded with: $firstDialog"
                 return 0
                 ;;
         esac
@@ -72,14 +79,14 @@ OOP
         )
         case "$dropdownPrompt" in
             'cancelled')
-                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                log_Message "User selected cancel"
                 return 1
                 ;;
             'timeout')
-                echo "Log: $(date "+%F %T") Timed out, re-prompting" | tee -a "$logPath"
+                log_Message "Timed out, re-prompting"
                 ;;
             *)
-                echo "Log: $(date "+%F %T") User chose: $dropdownPrompt" | tee -a "$logPath"
+                log_Message "User chose: $dropdownPrompt"
                 return 0
                 ;;
         esac
@@ -102,14 +109,14 @@ OOP
         )
         case "$customDialogPath" in
             'cancelled')
-                echo "Log: $(date "+%F %T") User selected cancel" | tee -a "$logPath"
+                log_Message "User selected cancel"
                 return 1
                 ;;
             '')
-                echo "Log: $(date "+%F %T") No response, re-prompting" | tee -a "$logPath"
+                log_Message "No response, re-prompting"
                 ;;
             *)
-                echo "Log: $(date "+%F %T") User chose: $customDialogPath" | tee -a "$logPath"
+                log_Message "User chose: $customDialogPath"
                 return 0
                 ;;
         esac
@@ -119,17 +126,24 @@ OOP
 # Search a custom path folder for the search filter, excluding library for a quick search
 function custom_Search() {
     local path="$1"
+    local tempFile=$(/usr/bin/mktemp)
+    local searchCount=0
     if [[ -d "$path" ]];
     then
-        echo "Log: $(date "+%F %T") Beginning search at $path for: $firstDialog" | tee -a "$logPath"
-        echo "Log: $(date "+%F %T") Searching for files at $path for: $firstDialog" >> "$foundFilesPath"
+        log_Message "Beginning search at $path for: $firstDialog"
+        log_Message "Searching for files at $path for: $firstDialog" >> "$foundFilesPath"
         if [ "$quickSearchActivated" -eq 0 ];
         then
-            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null | sort -r >> "$foundFilesPath"
+            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         else
-            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null | sort -r >> "$foundFilesPath"
+            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
-        echo "Log: $(date "+%F %T") Completed search at $path" | tee -a "$logPath"
+
+        searchCount=$(wc -l < "$tempFile")
+        fileCount=$((fileCount + searchCount))
+        rm -f "$tempFile"
+
+        log_Message "Completed search at $path"
         return 0
     else
         return 1
@@ -139,21 +153,28 @@ function custom_Search() {
 # Search within specified file types for the search filter, excluding library for a quick search 
 function within_Files() {
     local path="$1"
+    local tempFile=$(/usr/bin/mktemp)
+    local searchCount=0
     if [[ -d "$path" ]];
     then
-        echo "Log: $(date "+%F %T") Beginning search within files at $path for: $firstDialog" | tee -a "$logPath"
-        echo "Log: $(date "+%F %T") Searching within files at $path for: $firstDialog" >> "$foundFilesPath"
+        log_Message "Beginning search within files at $path for: $firstDialog"
+        log_Message "Searching within files at $path for: $firstDialog" >> "$foundFilesPath"
         if [ "$quickSearchActivated" -eq 0 ];
         then
             find "$path" -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r >> "$foundFilesPath"
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         else
             find "$path" -path "/Users/$userAccount/Library" -prune -o -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r >> "$foundFilesPath"
+                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
-        echo "Log: $(date "+%F %T") Completed search within files at $path" | tee -a "$logPath"
+
+        searchCount=$(wc -l < "$tempFile")
+        fileCount=$((fileCount + searchCount))
+        rm -f "$tempFile"
+
+        log_Message "Completed search within files at $path"
         return 0
     else
         return 1
@@ -164,7 +185,7 @@ function within_Files() {
 function sudo_Check() {
     if [ "$(id -u)" -ne 0 ];
     then
-        echo "Please run this script as root or using sudo!"
+        printf "Please run this script as root or using sudo!\n"
         exit 1
     fi
 }
@@ -174,35 +195,40 @@ function exit_Nicely() {
     local exitCode=$?
     if [ $exitCode -ne 0 ];
     then
-        echo "Log: $(date "+%F %T") Script interrupted or terminated" | tee -a "$logPath"
+        log_Message "Script interrupted or terminated"
         if [[ -f "$foundFilesPath" ]];
         then
-            echo "Log: $(date "+%F %T") Search incomplete - script interrupted" >> "$foundFilesPath"
+            log_Message "Search incomplete - script interrupted" >> "$foundFilesPath"
             open "$foundFilesPath"
         fi
-        echo "Log: $(date "+%F %T") Exiting with code: $exitCode" | tee -a "$logPath"
+        log_Message "Exiting with code: $exitCode"
         exit $exitCode
     else
-        open "$foundFilesPath"
-        echo "Log: $(date "+%F %T") Exiting successfully" | tee -a "$logPath"
+        if [ $fileCount -gt 0 ];
+        then
+            open "$foundFilesPath"
+        fi
+        log_Message "Exiting successfully"
     fi
 }
 
 function main() {
     sudo_Check
+    printf "Log: $(date "+%F %T") Beginning File Search script.\n" | tee "$logPath"
+
     if [ ! -d "$iconPath" ];
     then
-        echo "Log: $(date "+%F %T") Missing icon for AppleScript prompt, exiting" | tee "$logPath"
+        log_Message "Missing icon for AppleScript prompt, exiting" | tee "$logPath"
         exit 1
     fi
 
-    echo "Log: $(date "+%F %T") Beginning File Search log" | tee "$logPath"
     while true;
     do
-        echo "Log: $(date "+%F %T") Displaying first dialog" | tee -a "$logPath"
+        fileCount=0
+        log_Message "Displaying first dialog"
         if ! first_Dialog;
         then
-            echo "Log: $(date "+%F %T") Exiting at first dialog" | tee -a "$logPath"
+            log_Message "Exiting at first dialog"
             exit 0
         fi
         
@@ -211,10 +237,10 @@ function main() {
         while [ $scanComplete -eq 0 ] && [ $returnToFirstDialog -eq 0 ];
         do
             quickSearchActivated=0
-            echo "Log: $(date "+%F %T") Displaying drop-down prompt" | tee -a "$logPath"
+            log_Message "Displaying drop-down prompt"
             if ! dropdown_Prompt;
             then
-                echo "Log: $(date "+%F %T") Going back to first dialog" | tee -a "$logPath"
+                log_Message "Going back to first dialog"
                 returnToFirstDialog=1
             else
                 if [ ! -f "$foundFilesPath" ];
@@ -227,12 +253,12 @@ function main() {
                         quickSearchActivated=1
                         if ! custom_Search "$homePath";
                         then
-                            echo "Log: $(date "+%F %T") Exiting at home search for invalid path" | tee -a "$logPath"
+                            log_Message "Exiting at home search for invalid path"
                             exit 1
                         fi
                         if ! within_Files "$homePath";
                         then
-                            echo "Log: $(date "+%F %T") Invalid path for searching within files" | tee -a "$logPath"
+                            log_Message "Invalid path for searching within files"
                             exit 1
                         fi
                         scanComplete=1
@@ -241,12 +267,12 @@ function main() {
                     'Home Scan -'*)
                         if ! custom_Search "$homePath";
                         then
-                            echo "Log: $(date "+%F %T") Invalid path for searching files" | tee -a "$logPath"
+                            log_Message "Invalid path for searching files"
                             exit 1
                         fi
                         if ! within_Files "$homePath";
                         then
-                            echo "Log: $(date "+%F %T") Invalid path for searching within files" | tee -a "$logPath"
+                            log_Message "Invalid path for searching within files"
                             exit 1
                         fi
                         scanComplete=1
@@ -255,31 +281,31 @@ function main() {
                     'Deep Scan - Entire Drive')
                         if ! custom_Search "/";
                         then
-                            echo "Log: $(date "+%F %T") Invalid path for searching files" | tee -a "$logPath"
+                            log_Message "Invalid path for searching files"
                             exit 1
                         fi
                         if ! within_Files "/";
                         then
-                            echo "Log: $(date "+%F %T") Invalid path for searching within files" | tee -a "$logPath"
+                            log_Message "Invalid path for searching within files"
                             exit 1
                         fi
                         scanComplete=1
                         ;;
                         
                     'Custom Scan')
-                        echo "Log: $(date "+%F %T") Displaying custom search dialog" | tee -a "$logPath"
+                        log_Message "Displaying custom search dialog"
                         if ! customSearch_FolderChoice;
                         then
-                            echo "Log: $(date "+%F %T") Going back to drop-down prompt" | tee -a "$logPath"
+                            log_Message "Going back to drop-down prompt"
                         else
                             if ! custom_Search "$customDialogPath";
                             then
-                                echo "Log: $(date "+%F %T") Invalid path for searching files" | tee -a "$logPath"
+                                log_Message "Invalid path for searching files"
                                 exit 1
                             fi
                             if ! within_Files "$customDialogPath";
                             then
-                                echo "Log: $(date "+%F %T") Invalid path for searching within files" | tee -a "$logPath"
+                                log_Message "Invalid path for searching within files"
                                 exit 1
                             fi
                             scanComplete=1
@@ -291,7 +317,18 @@ function main() {
 
         if [ $scanComplete -eq 1 ];
         then
-            echo "Log: $(date "+%F %T") Found file logs can be found at $foundFilesPath" | tee -a "$logPath"
+            if [ $fileCount -lt 1 ];
+            then
+                log_Message "No files found"
+                if [[ -f "$foundFilesPath" ]];
+                then
+                    rm -f "$foundFilesPath"
+                fi
+            else
+                log_Message "Found $fileCount files"
+                log_Message "Found file logs can be found at $foundFilesPath"
+            fi
+
             exit 0
         fi
     done
