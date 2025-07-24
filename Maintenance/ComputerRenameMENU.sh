@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 06-28-23  ###
 ### Updated: 07-24-25  ###
-### Version: 2.8       ###
+### Version: 3.0       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -67,23 +67,16 @@ function login_Check() {
 # Ask the user if they want to rename the device
 function rename_Prompt() {
     renameResult=$(osascript <<OOP
-        set dialogResult to display dialog "This device name already contains a department prefix, would you like to choose a new one?\n\nCurrent Name: $currentName" buttons {"Keep", "Change"} default button "Keep" with icon POSIX file "$effectiveIconPath" with title "$dialogTitle" giving up after 900
-        if button returned of dialogResult is equal to "Change" then
-            return "User selected: Change"
-        else
-            return "Dialog timed out"
-        end if
+    set dialogResult to display dialog \
+    "This device name already contains a department prefix, would you like to choose a new one?\n\nCurrent Name: $currentName" \
+    buttons {"Keep", "Change"} default button "Keep" with icon POSIX file "$effectiveIconPath" with title "$dialogTitle" giving up after 900
+    if button returned of dialogResult is equal to "Change" then
+        return "User selected: Change"
+    else
+        return "Dialog timed out"
+    end if
 OOP
 	)
-}
-
-# Contains scutil commands to change device name
-function rename_Device() {
-    local name="$1"
-    /usr/sbin/scutil --set ComputerName $name
-    /usr/sbin/scutil --set LocalHostName $name
-    /usr/sbin/scutil --set HostName $name
-    /usr/local/bin/jamf recon	
 }
 
 # Prompts user to choose device department prefix
@@ -94,24 +87,20 @@ function department_Prompt() {
     {"1818 - 1818 Program", "AAS - African-American Studies", "AAF - Academic Affairs", "ADM - Administration Arts and Sciences",\
     "AHP - Allied Health Professions", "AMS - American Studies", "AT - Athletics", "Academic Tech Commons", "BF - Business & Finance",\
     "BIO - Biology", "BIOC - Biochemistry", "CADE - Center for Advanced Dental Education", "CASE - Ctr for Anatomical Science & Ed-Administration",\
-    "CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry",\
-    "CME - Continuing Medical Education(PAWS)", "CMM - Communications", "COMPMED - Comparative Medicine ", "CSB - Cook School of Business",\
-    "CSD - Speech, Language, and Hearing Sciences", "CTO - Clinical Trial Office", "CWOD - Ctr for Workforce & Org Development",\
-    "DPS - Department of Public Safety", "DUR - University Development","FPA - Fine & Performing Arts",\
-    "EAS - Earth and Atmospheric Science", "EM - Enrollment Management", "ENG - English",\
-    "EU - Clinical Skill", "EVT - Event Services", "FAC - Facilities",\
-    "GC - Office of General Counsel", "HIS - History", "HR - Human Resources",\
-    "IPE - Interprofessional Education Program", "IM - Internal Medicine", "IM-GI - GI-Research", "INTO - INTO_SLU",\
-    "ITS - Information Technology Services", "Lab Device", "LIB - Libraries", "LAW - School of Law",\
-    "MAR - Marketing & Communications", "MED - Medical School", "MM - Mission & Ministry",\
-    "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
-    "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art", "NEU - Neurology",\
-    "PATH - Pathology", "PAR - Parks College", "PEDS - Pediatrics", "PHARM - Pharmacology and Physiology","PHY - Philosophy",\
-    "PHYS - Physics", "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
-    "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology",\
-    "SLUCOR - SLU Center of Outcomes Research", "SOE - School of Education", "SON - School of Nursing", "SPH - School of Public Health",\
-    "SPS - School of Professional Studies", "SDEV - Student Development", "SW - Social Work",\
-    "THE - Theological Studies", "WMS - Women’s Studies Program"} \
+    "CFS - Center for Sustainability", "CHCE - Center for HealthCare Ethics", "CHM - Chemistry", "CME - Continuing Medical Education(PAWS)",\
+    "CMM - Communications", "COMPMED - Comparative Medicine ", "CSB - Cook School of Business", "CSD - Speech, Language, and Hearing Sciences",\
+    "CTO - Clinical Trial Office", "CWOD - Ctr for Workforce & Org Development", "DPS - Department of Public Safety",\
+    "DUR - University Development","FPA - Fine & Performing Arts", "EAS - Earth and Atmospheric Science", "EM - Enrollment Management",\
+    "ENG - English", "EU - Clinical Skill", "EVT - Event Services", "FAC - Facilities", "GC - Office of General Counsel", "HIS - History",\
+    "HR - Human Resources", "IPE - Interprofessional Education Program", "IM - Internal Medicine", "IM-GI - GI-Research", "INTO - INTO_SLU",\
+    "ITS - Information Technology Services", "Lab Device", "LIB - Libraries", "LAW - School of Law", "MAR - Marketing & Communications",\
+    "MED - Medical School", "MM - Mission & Ministry", "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
+    "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art", "NEU - Neurology", "PATH - Pathology",\
+    "PAR - Parks College", "PEDS - Pediatrics", "PHARM - Pharmacology and Physiology","PHY - Philosophy", "PHYS - Physics",\
+    "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
+    "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology", "SLUCOR - SLU Center of Outcomes Research",\
+    "SOE - School of Education", "SON - School of Nursing", "SPH - School of Public Health", "SPS - School of Professional Studies",\
+    "SDEV - Student Development", "SW - Social Work", "THE - Theological Studies", "WMS - Women’s Studies Program"} \
     with title "$dialogTitle" with prompt "Please choose your department:"
     return dropdownResult
 OOP
@@ -119,7 +108,7 @@ OOP
     dept=$(echo "$department" | sed 's/\(.*\) - .*/\1/' | sed 's/[[:space:]]*$//')
     if [[ "$dept" == *"false"* ]];
     then
-        log_Message "User canceled the operation"
+        log_Message "User selected cancel"
         exit 0
     elif [[ "$department" == *"Lab Device"* ]];
     then
@@ -131,7 +120,7 @@ OOP
         deptName="${dept}-${serialShort}"
         log_Message "User chose: \"$dept\""
         log_Message "Current computer name: \"$currentName\""
-        log_Message "Renaming device to \"$deptName\""
+        log_Message "Renaming device: \"$deptName\""
         rename_Device "$deptName"
     fi
 }
@@ -139,41 +128,36 @@ OOP
 # Seperate dialog list for lab devices
 function lab_Prompt(){
     log_Message "User chose: \"Lab Device\""
-    chosenLab=$(osascript <<YOO
+    chosenLab=$(osascript <<OOP
     set dropdownResult to choose from list \
     {"216 - Des Peres", "2104 - Morrissey", "202 - Xavier", "207 - Xavier", "220 - Xavier", "236 - Xavier"}\
     with title "$dialogTitle" with prompt "Please choose the Lab in which this device will be located:"
     return dropdownResult
-YOO
+OOP
 	)
     labPrefix=$(echo "$chosenLab" | sed 's/\(.*\) - .*/\1/' | sed 's/[[:space:]]*$//')
-    # Cancels the operation if the user selects Cancel from the osascript prompt
     if [[ "$chosenLab" == *"false"* ]];
     then
-        log_Message "User canceled the operation"
+        log_Message "User selected cancel"
         department_Prompt
-    # Name appropriately for Des Peres
     elif [[ "$chosenLab" == *"Des Peres"* ]];
     then
         labName="DP-${labPrefix}-$serialShort"
         log_Message "User chose: \"Des Peres lab $labPrefix\""
-        log_Message "Renaming device to \"$labName\""
+        log_Message "Renaming device: \"$labName\""
         rename_Device "$labName"
-    # Name appropriately for Xavier
     elif [[ "$chosenLab" == *"Xavier"* ]];
     then
         labName="XVH-${labPrefix}-$serialShort"
         log_Message "User chose: \"Xavier lab $labPrefix\""
-        log_Message "Renaming device to \"$labName\""
+        log_Message "Renaming device: \"$labName\""
         rename_Device "$labName"
-    # Name appropriately for Morrissey
     elif [[ "$chosenLab" == *"Morrissey"* ]];
     then
         labName="MOR-${labPrefix}-$serialShort"
         log_Message "User chose: \"Morrissey lab $labPrefix\""
-        log_Message "Renaming device to \"$labName\""
+        log_Message "Renaming device: \"$labName\""
         rename_Device "$labName"
-    # Just in case
     else
         log_Message "Error'd out"
         exit 1
@@ -183,33 +167,42 @@ YOO
 # Seperate dialog list for atc devices
 function atc_Prompt() {
     log_Message "User chose: \"ATC Device\""
-    chosenATC=$(osascript <<YOO
+    chosenATC=$(osascript <<OOP
     set dropdownResult to choose from list {"ATC - General", "LNR - Loaner"}\
     with title "$dialogTitle" with prompt "Please choose the ATC area in which this device will be located:"
     return dropdownResult
-YOO
+OOP
 	)
     atcPrefix=$(echo "$chosenATC" | sed 's/\(.*\) - .*/\1/' | sed 's/[[:space:]]*$//')
     if [[ "$chosenATC" == *"false"* ]];
     then
-        log_Message "User canceled the operation."
+        log_Message "User selected cancel"
         department_Prompt
     elif [[ "$chosenATC" == *"General"* ]];
     then
         atcName="${atcPrefix}-$serialShort"
         log_Message "User chose: \"General $atcPrefix\""
-        log_Message "Renaming device to \"$atcName\""
+        log_Message "Renaming device: \"$atcName\""
         rename_Device "$atcName"
     elif [[ "$chosenATC" == *"Loaner"* ]];
     then
         atcName="ATC-${atcPrefix}-$serialShort"
         log_Message "User chose: \"Loaner $atcPrefix\""
-        log_Message "Renaming device to \"$atcName\""
+        log_Message "Renaming device: \"$atcName\""
         rename_Device "$atcName"
     else
         log_Message "Error'd out"
         exit 1
     fi
+}
+
+# Contains scutil commands to change device name
+function rename_Device() {
+    local name="$1"
+    /usr/sbin/scutil --set ComputerName $name
+    /usr/sbin/scutil --set LocalHostName $name
+    /usr/sbin/scutil --set HostName $name
+    /usr/local/bin/jamf recon	
 }
 
 function main() {
@@ -242,8 +235,8 @@ function main() {
     # If so, prompt the user to choose their department prefix.
     elif [[ $currentName == *-*-* ]];
     then
-        log_Message "Device name contains a double prefix"
         longPrefix=$(echo "$currentName" | sed 's/\(.*-\).*$/\1/')
+        log_Message "Device name contains a double prefix: \"$longPrefix\""
         newLongName="${longPrefix}${serialShort}"
         rename_Prompt
         if [[ $renameResult == *"Change"* ]];
@@ -255,7 +248,7 @@ function main() {
             then
                 log_Message "Device already named correctly: \"$currentName\""
             else
-                log_Message "Renaming device to \"$newLongName\""
+                log_Message "Renaming device: \"$newLongName\""
                 rename_Device "$newLongName"
             fi
         fi
@@ -264,8 +257,8 @@ function main() {
     # If so, prompt the user to choose their department prefix.
     elif [[ $currentName == *"-"* ]];
     then
-        log_Message "Device name contains a prefix"
         prefix=$(echo "$currentName" | sed 's/\(.*-\).*/\1/')
+        log_Message "Device name contains a prefix: \"$prefix\""
         newName="${prefix}${serialShort}"
         if [[ ! "$prefix" == 'SLU-' ]];
         then
@@ -279,7 +272,7 @@ function main() {
                 then
                     log_Message "Device already named correctly: \"$currentName\""
                 else
-                    log_Message "Renaming device to \"$newName\""
+                    log_Message "Renaming device: \"$newName\""
                     rename_Device "$newName"
                 fi
             fi
