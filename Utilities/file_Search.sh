@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 01-30-25  ###
-### Updated: 07-23-25  ###
-### Version: 1.9       ###
+### Updated: 07-24-25  ###
+### Version: 1.10      ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -165,7 +165,7 @@ OOP
 }
 
 # Search a custom path folder for the search filter, excluding library for a quick search
-function custom_Search() {
+function search_Files() {
     local path="$1"
     local tempFile=$(/usr/bin/mktemp)
     local searchCount=0
@@ -261,7 +261,7 @@ function exit_Nicely() {
 
 function main() {
     sudo_Check
-    printf "Log: $(date "+%F %T") Beginning File Search script.\n" | tee "$logPath"
+    printf "Log: $(date "+%F %T") Beginning File Search script\n" | tee "$logPath"
 
     if [ ! -d "$iconPath" ];
     then
@@ -273,7 +273,6 @@ function main() {
     do
         fileCount=0
         foundFilesArray=()
-        
         log_Message "Displaying first dialog"
         if ! first_Dialog;
         then
@@ -300,7 +299,7 @@ function main() {
                 case "$dropdownPrompt" in
                     'Quick Scan')
                         quickSearchActivated=1
-                        if ! custom_Search "$homePath";
+                        if ! search_Files "$homePath";
                         then
                             log_Message "Exiting at home search for invalid path"
                             exit 1
@@ -314,7 +313,7 @@ function main() {
                         ;;
                         
                     'Home Scan -'*)
-                        if ! custom_Search "$homePath";
+                        if ! search_Files "$homePath";
                         then
                             log_Message "Invalid path for searching files"
                             exit 1
@@ -328,7 +327,7 @@ function main() {
                         ;;
                         
                     'Deep Scan - Entire Drive')
-                        if ! custom_Search "/";
+                        if ! search_Files "/";
                         then
                             log_Message "Invalid path for searching files"
                             exit 1
@@ -347,7 +346,7 @@ function main() {
                         then
                             log_Message "Going back to drop-down prompt"
                         else
-                            if ! custom_Search "$customDialogPath";
+                            if ! search_Files "$customDialogPath";
                             then
                                 log_Message "Invalid path for searching files"
                                 exit 1
@@ -373,7 +372,7 @@ function main() {
                 then
                     rm -f "$foundFilesPath"
                 fi
-                /usr/bin/osascript -e 'display dialog "No files found matching '"$firstDialog"'" buttons {"OK"} default button "OK" with title "'"$dialogTitle"'" with icon POSIX file "'"$finderIconPath"'"'
+                /usr/bin/osascript -e 'display dialog "No files found matching '"$firstDialog"'" buttons {"OK"} default button "OK" with title "'"$dialogTitle"'" with icon POSIX file "'"$finderIconPath"'"' >/dev/null
             else
                 log_Message "Found $fileCount files"
                 log_Message "Found file logs can be found at $foundFilesPath"
