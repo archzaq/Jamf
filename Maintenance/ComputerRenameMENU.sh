@@ -217,9 +217,9 @@ function rename_Device() {
     local name="$1"
     if [[ -n "$name" ]];
     then
-        /usr/sbin/scutil --set ComputerName $name
-        /usr/sbin/scutil --set LocalHostName $name
-        /usr/sbin/scutil --set HostName $name
+        /usr/sbin/scutil --set ComputerName "$name"
+        /usr/sbin/scutil --set LocalHostName "$name"
+        /usr/sbin/scutil --set HostName "$name"
         /usr/local/bin/jamf recon	
     else
         log_Message "ERROR: Name is empty"
