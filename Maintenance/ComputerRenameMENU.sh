@@ -56,10 +56,10 @@ function icon_Check() {
 function login_Check() {
     if [[ "$currentUser" == 'root' ]] || [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == '_mbsetupuser' ]];
     then
-        log_Message "Invalid user logged in: $currentUser"
+        log_Message "Invalid user logged in: \"$currentUser\""
         return 1
     else
-        log_Message "Valid user logged in: $currentUser"
+        log_Message "Valid user logged in: \"$currentUser\""
         return 0
     fi
 }
