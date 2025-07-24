@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 01-30-25  ###
-### Updated: 07-15-25  ###
-### Version: 1.8       ###
+### Updated: 07-23-25  ###
+### Version: 1.9       ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -18,6 +18,7 @@ readonly dialogTitle='File Search'
 readonly logPath='/var/log/fileSearch.log'
 quickSearchActivated=0
 fileCount=0
+declare -a foundFilesArray=()
 
 # Append current status to log file
 function log_Message() {
@@ -29,20 +30,22 @@ function first_Dialog() {
     while true;
     do
         firstDialog=$(/usr/bin/osascript <<OOP
-        try
-            set prompt to "Welcome to File Search!\n\nPlease enter the text you would like to search for:"
-            set dialogResult to display dialog prompt buttons {"Cancel", "Continue"} default answer "" default button "Continue" \
-                with title "$dialogTitle" with icon POSIX file "$finderIconPath" giving up after 900
-            set buttonChoice to button returned of dialogResult
-            set typedText to text returned of dialogResult
-            if buttonChoice is equal to "Continue" then
-                return typedText
-            else
-                return buttonChoice
-            end if
-        on error
-            return "cancelled"
-        end try
+        tell application "System Events"
+            try
+                set prompt to "Welcome to File Search!\n\nPlease enter the text you would like to search for:"
+                set dialogResult to display dialog prompt buttons {"Cancel", "Continue"} default answer "" default button "Continue" \
+                    with title "$dialogTitle" with icon POSIX file "$finderIconPath" giving up after 900
+                set buttonChoice to button returned of dialogResult
+                set typedText to text returned of dialogResult
+                if buttonChoice is equal to "Continue" then
+                    return typedText
+                else
+                    return buttonChoice
+                end if
+            on error
+                return "cancelled"
+            end try
+        end tell
 OOP
         )
         case "$firstDialog" in
@@ -66,8 +69,10 @@ function dropdown_Prompt() {
     while true;
     do
         dropdownPrompt=$(/usr/bin/osascript <<OOP
-        set options to {"Quick Scan", "Home Scan - $homePath", "Deep Scan - Entire Drive", "Custom Scan"}
-        set userChoice to (choose from list options with prompt "Please choose the depth for which to search:" default items "Quick Scan" with title "$dialogTitle")
+        tell application "System Events"
+            set options to {"Quick Scan", "Home Scan - $homePath", "Deep Scan - Entire Drive", "Custom Scan"}
+            set userChoice to (choose from list options with prompt "Please choose the depth for which to search:" default items "Quick Scan" with title "$dialogTitle")
+        end tell
         if userChoice is false then
             return "cancelled"
         else if userChoice is {} then
@@ -98,13 +103,15 @@ function customSearch_FolderChoice() {
     while true;
     do
         customDialogPath=$(/usr/bin/osascript <<OOP
-        try
-            set selectedFolder to (choose folder with prompt "Select a folder to search within:")
-            set folderPath to POSIX path of selectedFolder
-            return folderPath
-        on error
-            return "cancelled"
-        end try
+        tell application "System Events"
+            try
+                set selectedFolder to (choose folder with prompt "Select a folder to search within:")
+                set folderPath to POSIX path of selectedFolder
+                return folderPath
+            on error
+                return "cancelled"
+            end try
+        end tell
 OOP
         )
         case "$customDialogPath" in
@@ -123,6 +130,40 @@ OOP
     done
 }
 
+# AppleScript - Display found files in dropdown
+function display_FoundFiles() {
+    local filesList=""
+    for file in "${foundFilesArray[@]}";
+    do
+        filesList="${filesList}\"${file}\","
+    done
+    filesList="${filesList%,}"
+    
+    selectedFile=$(/usr/bin/osascript <<OOP
+    tell application "System Events"
+        set fileOptions to {${filesList}}
+        set prompt to "Found ${fileCount} file(s) for $firstDialog. Select a file to open it:"
+        set userChoice to (choose from list fileOptions with prompt prompt with title "$dialogTitle" OK button name "Open" cancel button name "Done")
+        if userChoice is false then
+            return "done"
+        else
+            return (item 1 of userChoice)
+        end if
+    end tell
+OOP
+    )
+    
+    if [[ "$selectedFile" != "done" ]] && [[ -n "$selectedFile" ]];
+    then
+        log_Message "User selected file: $selectedFile"
+        open "$selectedFile"
+        return 0
+    else
+        log_Message "User closed file selection dialog"
+        return 1
+    fi
+}
+
 # Search a custom path folder for the search filter, excluding library for a quick search
 function custom_Search() {
     local path="$1"
@@ -138,6 +179,11 @@ function custom_Search() {
         else
             find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
+
+        while IFS= read -r line;
+        do
+            foundFilesArray+=("$line")
+        done < "$tempFile"
 
         searchCount=$(wc -l < "$tempFile")
         fileCount=$((fileCount + searchCount))
@@ -169,6 +215,11 @@ function within_Files() {
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
                 -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
+
+        while IFS= read -r line;
+        do
+            foundFilesArray+=("$line")
+        done < "$tempFile"
 
         searchCount=$(wc -l < "$tempFile")
         fileCount=$((fileCount + searchCount))
@@ -204,10 +255,6 @@ function exit_Nicely() {
         log_Message "Exiting with code: $exitCode"
         exit $exitCode
     else
-        if [ $fileCount -gt 0 ];
-        then
-            open "$foundFilesPath"
-        fi
         log_Message "Exiting successfully"
     fi
 }
@@ -225,6 +272,8 @@ function main() {
     while true;
     do
         fileCount=0
+        foundFilesArray=()
+        
         log_Message "Displaying first dialog"
         if ! first_Dialog;
         then
@@ -324,9 +373,18 @@ function main() {
                 then
                     rm -f "$foundFilesPath"
                 fi
+                /usr/bin/osascript -e 'display dialog "No files found matching '"$firstDialog"'" buttons {"OK"} default button "OK" with title "'"$dialogTitle"'" with icon POSIX file "'"$finderIconPath"'"'
             else
                 log_Message "Found $fileCount files"
                 log_Message "Found file logs can be found at $foundFilesPath"
+                
+                while true;
+                do
+                    if ! display_FoundFiles;
+                    then
+                        break
+                    fi
+                done
             fi
 
             exit 0
@@ -339,4 +397,3 @@ trap exit_Nicely EXIT
 trap 'exit' INT TERM HUP
 
 main
-
