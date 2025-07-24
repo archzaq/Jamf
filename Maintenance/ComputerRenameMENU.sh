@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 06-28-23  ###
 ### Updated: 07-24-25  ###
-### Version: 3.0       ###
+### Version: 3.1       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -310,7 +310,7 @@ function main() {
     # If the current device name fails to match any conditions,
     # prompt the user to choose their department prefix.
     else
-        department_Prompt # department prompt function
+        department_Prompt
     fi
 
     exit 0
