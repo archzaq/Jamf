@@ -42,7 +42,7 @@ function icon_Check() {
                 log_Message "Generic icon found"
                 effectiveIconPath="$genericIconPath"
             else
-                log_Message "Generic icon not found"
+                log_Message "ERROR: Generic icon not found"
                 return 1
             fi
         fi
@@ -56,7 +56,7 @@ function icon_Check() {
 function login_Check() {
     if [[ "$currentUser" == 'root' ]] || [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == '_mbsetupuser' ]];
     then
-        log_Message "Invalid user logged in: \"$currentUser\""
+        log_Message "ERROR: Invalid user logged in: \"$currentUser\""
         return 1
     else
         log_Message "Valid user logged in: \"$currentUser\""
@@ -68,11 +68,11 @@ function login_Check() {
 function serial_Check() {
     if [[ -z "$computerSerial" ]];
     then
-        log_Message "Error: Could not retrieve serial number"
+        log_Message "ERROR: Could not retrieve serial number"
         return 1
     elif [[ ${#computerSerial} -lt 6 ]];
     then
-        log_Message "Error: Serial number too short: \"$computerSerial\""
+        log_Message "ERROR: Serial number too short: \"$computerSerial\""
         return 1
     else
         log_Message "Valid serial number found: \"$serialShort\""
@@ -175,7 +175,7 @@ OOP
         log_Message "Renaming device: \"$labName\""
         rename_Device "$labName"
     else
-        log_Message "Error'd out"
+        log_Message "ERROR: Error'd out"
         exit 1
     fi
 }
@@ -207,7 +207,7 @@ OOP
         log_Message "Renaming device: \"$atcName\""
         rename_Device "$atcName"
     else
-        log_Message "Error'd out"
+        log_Message "ERROR: Error'd out"
         exit 1
     fi
 }
@@ -215,10 +215,16 @@ OOP
 # Contains scutil commands to change device name
 function rename_Device() {
     local name="$1"
-    /usr/sbin/scutil --set ComputerName $name
-    /usr/sbin/scutil --set LocalHostName $name
-    /usr/sbin/scutil --set HostName $name
-    /usr/local/bin/jamf recon	
+    if [[ -n "$name" ]];
+    then
+        /usr/sbin/scutil --set ComputerName $name
+        /usr/sbin/scutil --set LocalHostName $name
+        /usr/sbin/scutil --set HostName $name
+        /usr/local/bin/jamf recon	
+    else
+        log_Message "ERROR: Name is empty"
+        exit 1
+    fi
 }
 
 function main() {
@@ -227,21 +233,21 @@ function main() {
     log_Message "Checking for SLU icon"
     if ! icon_Check;
     then
-        log_Message "Exiting at icon check"
+        log_Message "ERROR: Exiting at icon check"
         exit 1
     fi
 
     log_Message "Checking for valid serial"
     if ! serial_Check;
     then
-        log_Message "Exiting at serial check"
+        log_Message "ERROR: Exiting at serial check"
         exit 1
     fi
 
     log_Message "Checking for currently logged in user"
     if ! login_Check;
     then
-        log_Message "Exiting at login check"
+        log_Message "ERROR: Exiting at login check"
         exit 1
     fi
 
