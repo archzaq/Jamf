@@ -64,6 +64,22 @@ function login_Check() {
     fi
 }
 
+# Validate serial number
+function serial_Check() {
+    if [[ -z "$computerSerial" ]];
+    then
+        log_Message "Error: Could not retrieve serial number"
+        return 1
+    elif [[ ${#computerSerial} -lt 6 ]];
+    then
+        log_Message "Error: Serial number too short: \"$computerSerial\""
+        return 1
+    else
+        log_Message "Valid serial number found: \"$serialShort\""
+        return 0
+    fi
+}
+
 # Ask the user if they want to rename the device
 function rename_Prompt() {
     renameResult=$(osascript <<OOP
@@ -208,19 +224,24 @@ function rename_Device() {
 function main() {
     printf "Log: $(date "+%F %T") Beginning Computer Rename Menu script\n" | tee "$logPath"
 
-    # Check for SLU icon file
     log_Message "Checking for SLU icon"
     if ! icon_Check;
     then
-        log_Message "Exiting for no valid icon file"
+        log_Message "Exiting at icon check"
         exit 1
     fi
 
-    # Check for valid user being logged in
+    log_Message "Checking for valid serial"
+    if ! serial_Check;
+    then
+        log_Message "Exiting at serial check"
+        exit 1
+    fi
+
     log_Message "Checking for currently logged in user"
     if ! login_Check;
     then
-        log_Message "Exiting for invalid user logged in"
+        log_Message "Exiting at login check"
         exit 1
     fi
 
