@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 01-30-25  ###
 ### Updated: 07-25-25  ###
-### Version: 1.11      ###
+### Version: 1.12      ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -30,7 +30,7 @@ function log_Message() {
 function first_Dialog() {
     while true;
     do
-        firstDialog=$(/usr/bin/osascript <<OOP
+        searchFilter=$(/usr/bin/osascript <<OOP
         tell application "System Events"
             try
                 set prompt to "Welcome to File Search!\n\nPlease enter the text you would like to search for:"
@@ -49,7 +49,7 @@ function first_Dialog() {
         end tell
 OOP
         )
-        case "$firstDialog" in
+        case "$searchFilter" in
             'cancelled')
                 log_Message "User selected cancel"
                 return 1
@@ -58,7 +58,7 @@ OOP
                 log_Message "No response, re-prompting"
                 ;;
             *)
-                log_Message "User responded with: $firstDialog"
+                log_Message "User responded with: $searchFilter"
                 return 0
                 ;;
         esac
@@ -143,7 +143,7 @@ function display_FoundFiles() {
     selectedFile=$(/usr/bin/osascript <<OOP
     tell application "System Events"
         set fileOptions to {${filesList}}
-        set prompt to "Found ${fileCount} file(s) for $firstDialog. Select a file to open it:"
+        set prompt to "Found ${fileCount} file(s) for $searchFilter. Select a file to open it:"
         set userChoice to (choose from list fileOptions with prompt prompt with title "$dialogTitle" OK button name "Open" cancel button name "Done")
         if userChoice is false then
             return "done"
@@ -172,13 +172,13 @@ function search_Files() {
     local searchCount=0
     if [[ -d "$path" ]];
     then
-        log_Message "Beginning search at $path for: $firstDialog"
-        log_Message "Searching for files at $path for: $firstDialog" >> "$foundFilesPath"
+        log_Message "Beginning search at $path for: $searchFilter"
+        log_Message "Searching for files at $path for: $searchFilter" >> "$foundFilesPath"
         if [ "$quickSearchActivated" -eq 0 ];
         then
-            find "$path" -type f -name "*${firstDialog}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
+            find "$path" -type f -name "*${searchFilter}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         else
-            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${firstDialog}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
+            find "$path" -path "$path/Library" -prune -false -o -type f -name "*${searchFilter}*" 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
 
         while IFS= read -r line;
@@ -204,17 +204,17 @@ function within_Files() {
     local searchCount=0
     if [[ -d "$path" ]];
     then
-        log_Message "Beginning search within files at $path for: $firstDialog"
-        log_Message "Searching within files at $path for: $firstDialog" >> "$foundFilesPath"
+        log_Message "Beginning search within files at $path for: $searchFilter"
+        log_Message "Searching within files at $path for: $searchFilter" >> "$foundFilesPath"
         if [ "$quickSearchActivated" -eq 0 ];
         then
             find "$path" -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
+                -exec grep -l "$searchFilter" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         else
             find "$path" -path "/Users/$userAccount/Library" -prune -o -type f \
                 \( -name "*.sh" -o -name "*.txt" -o -name "*.py" -o -name "*.plist" -o -name "*.csv" \) \
-                -exec grep -l "$firstDialog" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
+                -exec grep -l "$searchFilter" {} \; 2>/dev/null | sort -r | tee "$tempFile" >> "$foundFilesPath"
         fi
 
         while IFS= read -r line;
@@ -373,7 +373,7 @@ function main() {
                 then
                     rm -f "$foundFilesPath"
                 fi
-                /usr/bin/osascript -e 'display dialog "No files found matching '"$firstDialog"'" buttons {"OK"} default button "OK" with title "'"$dialogTitle"'" with icon POSIX file "'"$finderIconPath"'"' >/dev/null
+                /usr/bin/osascript -e 'display dialog "No files found matching '"$searchFilter"'" buttons {"OK"} default button "OK" with title "'"$dialogTitle"'" with icon POSIX file "'"$finderIconPath"'"' >/dev/null
             else
                 log_Message "Found $fileCount files"
                 log_Message "Found file logs can be found at $foundFilesPath"
