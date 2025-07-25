@@ -3,26 +3,32 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 05-05-24  ###
-### Version: 2.0       ###
+### Updated: 07-24-25  ###
+### Version: 3.0       ###
 ##########################
 
-readonly jamf_connect_plist="/Library/Managed Preferences/com.jamf.connect.plist"
-readonly jamf_connect_app="/Applications/Jamf Connect.app"
+readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
+readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
+readonly jamfConnectApp='/Applications/Jamf Connect.app'
 readonly logPath='/var/log/updateInventory.log'
+readonly maxAttempts=10
+
+# Append current status to log file
+function log_Message() {
+    local timestamp="$(date "+%F %T")"
+    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logPath"
+}
 
 # Attempt to handle a jamf policy already being run
-function check_already_running() {
+function check_PolicyStatus() {
     local checkResult="$1"
     local event="$2"
-    local maxAttempts=10
     local attempt=0
-
     while [[ $attempt -lt $maxAttempts ]];
     do
         if [[ $checkResult == *"already being run"* ]];
         then
-            echo "Log: $(date "+%F %T") Policy already being run, retrying in 30 seconds (Attempt $((attempt+1)))" | tee -a "$logPath"
+            log_Message "Policy already being run, retrying in 30 seconds (Attempt $((attempt+1)))"
             sleep 30
             ((attempt++))
             if [[ ! -z "$event" ]];
@@ -41,135 +47,99 @@ function check_already_running() {
 
 # Return false if the current device name doesnt fit naming scheme
 function check_Name() {
-    currentName=$(hostname)
-
-    # If the current device name contains "Mac" or "SLU" return false
     if [[ "$currentName" == *"Mac"* ]] || [[ "$currentName" == "SLU-"* ]];
     then
         return 1
-
-    # If the current device name already contains two hyphens return true
     elif [[ "$currentName" == *-*-* ]];
     then
         return 0
-
-    # If the current device name already contains a hyphen return true
     elif [[ "$currentName" == *"-"* ]];
     then
         return 0
-
-    # If the current device name fails to match any conditions return false
     else
         return 1
     fi
 }
 
-/usr/bin/caffeinate -d &
-CAFFEINATE_PID=$!
-trap "kill $CAFFEINATE_PID" EXIT
+function main() {
+    /usr/bin/caffeinate -d &
+    CAFFEINATE_PID=$!
+    trap "kill $CAFFEINATE_PID" EXIT
+    printf "Log: $(date "+%F %T") Beginning Update Inventory script.\n" | tee "$logPath"
 
-# Enrollment policies
-echo "Log: $(date "+%F %T") Checking for lingering enrollment policies" | tee "$logPath"
-
-enrollment_check_result=$(/usr/local/bin/jamf policy -event enrollmentComplete)
-if ! check_already_running "$enrollment_check_result" "enrollmentComplete";
-then
-    echo "Log: $(date "+%F %T") Checked $maxAttempts times, giving up" | tee -a "$logPath"
-else
-    echo "Log: $(date "+%F %T") Enrollment policy check complete" | tee -a "$logPath"
-fi
-
-
-
-sleep 1
-
-
-
-# General policies
-echo "Log: $(date "+%F %T") Checking for remaining policies" | tee -a "$logPath"
-
-policy_check_result=$(/usr/local/bin/jamf policy)
-if ! check_already_running "$policy_check_result";
-then
-    echo "Log: $(date "+%F %T") Checked $maxAttempts times, giving up" | tee -a "$logPath"
-else
-    echo "Log: $(date "+%F %T") Standard policy check complete" | tee -a "$logPath"
-fi
-
-
-
-sleep 1
-
-
-
-# Update inventory
-echo "Log: $(date "+%F %T") Updating inventory" | tee -a "$logPath"
-/usr/local/bin/jamf recon
-echo "Log: $(date "+%F %T") Inventory update complete" | tee -a "$logPath"
-
-
-
-# Rosetta runtime check
-if [[ $(/usr/bin/uname -p) = 'arm' ]];
-then
-    echo "Log: $(date "+%F %T") Checking for Rosetta runtime" | tee -a "$logPath"
-    if [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
+    log_Message "Checking for lingering enrollment policies"
+    enrollmentCheckResult=$(/usr/local/bin/jamf policy -event enrollmentComplete)
+    if ! check_PolicyStatus "$enrollmentCheckResult" "enrollmentComplete";
     then
-        echo "Log: $(date "+%F %T") Rosetta runtime not present, installing Rosetta" | tee -a "$logPath"
-        /usr/sbin/softwareupdate --install-rosetta --agree-to-license
-
-        sleep 1
-
-        echo "Log: $(date "+%F %T") Checking for other missing enrollment policies" | tee -a "$logPath"
-        /usr/local/bin/jamf policy -event enrollmentComplete
-
-        if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
-        then
-            echo "Log: $(date "+%F %T") Rosetta runtime still not present, trying install again" | tee -a "$logPath"
-            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
-        fi
+        log_Message "Checked $maxAttempts times, giving up"
     else
-        echo "Log: $(date "+%F %T") Rosetta runtime present" | tee -a "$logPath"
+        log_Message "Enrollment policy check complete"
     fi
-    echo "Log: $(date "+%F %T") Rosetta runtime check complete" | tee -a "$logPath"
-fi
 
+    sleep 1
 
+    log_Message "Checking for remaining standard policies"
+    policyCheckResult=$(/usr/local/bin/jamf policy)
+    if ! check_PolicyStatus "$policyCheckResult";
+    then
+        log_Message "Checked $maxAttempts times, giving up"
+    else
+        log_Message "Standard policy check complete"
+    fi
 
-sleep 1
+    sleep 1
 
+    log_Message "Updating inventory"
+    /usr/local/bin/jamf recon
+    log_Message "Inventory update complete"
 
+    if [[ $(/usr/bin/uname -p) = 'arm' ]];
+    then
+        log_Message "Checking for Rosetta runtime"
+        if [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
+        then
+            log_Message "Rosetta runtime not present, installing Rosetta"
+            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            sleep 1
+            log_Message "Checking for other missing enrollment policies"
+            /usr/local/bin/jamf policy -event enrollmentComplete
+            if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
+            then
+                log_Message "Rosetta runtime still not present, trying install again"
+                /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            fi
+        else
+            log_Message "Rosetta runtime present"
+        fi
+        log_Message "Rosetta runtime check complete"
+    fi
 
-# Naming check
-echo "Log: $(date "+%F %T") Checking for correct naming" | tee -a "$logPath"
+    sleep 1
 
-if ! check_Name;
-then
-    echo "Log: $(date "+%F %T") Device name, $currentName, does not fit naming scheme" | tee -a "$logPath"
-    /usr/local/bin/jamf policy -event rename
-else
-    echo "Log: $(date "+%F %T") Device name, $currentName, fits naming scheme" | tee -a "$logPath"
-fi
+    log_Message "Checking for correct naming"
+    if ! check_Name;
+    then
+        log_Message "Device name, \"$currentName\", does not fit naming scheme"
+        /usr/local/bin/jamf policy -event rename
+    else
+        log_Message "Device name, \"$currentName\", fits naming scheme"
+    fi
+    log_Message "Name check complete"
 
-echo "Log: $(date "+%F %T") Name check complete" | tee -a "$logPath"
+    sleep 1
 
+    log_Message "Checking for Jamf Connect"
+    if [[ ! -d "$jamfConnectApp" ]] || [[ ! -f "$jamfConnectPLIST" ]];
+    then
+        log_Message "Missing Jamf Connect, installing"
+        /usr/local/bin/jamf policy -event MissingJamfConnect
+    else
+        log_Message "Jamf Connect already installed"
+    fi
 
+    log_Message "Exiting!"
+    exit 0
+}
 
-sleep 1
+main
 
-
-
-# Jamf Connect check
-echo "Log: $(date "+%F %T") Checking for Jamf Connect" | tee -a "$logPath"
-if [[ ! -d "$jamf_connect_app" ]] || [[ ! -f "$jamf_connect_plist" ]];
-then
-    echo "Log: $(date "+%F %T") Missing Jamf Connect, installing" | tee -a "$logPath"
-    /usr/local/bin/jamf policy -event MissingJamfConnect
-else
-    echo "Log: $(date "+%F %T") Jamf Connect already installed" | tee -a "$logPath"
-fi
-
-
-
-echo "Log: $(date "+%F %T") Exiting!" | tee -a "$logPath"
-exit 0
