@@ -15,14 +15,15 @@ readonly foundFilesPath="${homePath}/Desktop/${dateAtStart}_fileSearch.log"
 readonly iconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/'
 readonly finderIconPath="${iconPath}/FinderIcon.icns"
 readonly dialogTitle='File Search'
-readonly logPath='/var/log/fileSearch.log'
+readonly logFile='/var/log/file_Search.log'
 quickSearchActivated=0
 fileCount=0
 declare -a foundFilesArray=()
 
 # Append current status to log file
 function log_Message() {
-    printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
+    local timestamp="$(date "+%F %T")"
+    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
 }
 
 # AppleScript - Ask user for search filter
@@ -261,7 +262,7 @@ function exit_Nicely() {
 
 function main() {
     sudo_Check
-    printf "Log: $(date "+%F %T") Beginning File Search script\n" | tee "$logPath"
+    printf "Log: $(date "+%F %T") Beginning File Search script\n" | tee "$logFile"
 
     if [ ! -d "$iconPath" ];
     then
