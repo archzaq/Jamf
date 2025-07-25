@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 01-30-25  ###
-### Updated: 07-24-25  ###
-### Version: 1.10      ###
+### Updated: 07-25-25  ###
+### Version: 1.11      ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -22,7 +22,7 @@ declare -a foundFilesArray=()
 
 # Append current status to log file
 function log_Message() {
-    printf "Log: $(date "+%F %T") %s\n" "$1"
+    printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
 }
 
 # AppleScript - Ask user for search filter
@@ -265,7 +265,7 @@ function main() {
 
     if [ ! -d "$iconPath" ];
     then
-        log_Message "Missing icon for AppleScript prompt, exiting" | tee "$logPath"
+        log_Message "Missing icon for AppleScript prompt, exiting"
         exit 1
     fi
 
