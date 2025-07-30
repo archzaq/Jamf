@@ -3,11 +3,11 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 07-24-25  ###
-### Version: 3.0       ###
+### Updated: 07-30-25  ###
+### Version: 3.1       ###
 ##########################
 
-readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
+currentName=$(/usr/sbin/scutil --get LocalHostName)
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
 readonly jamfConnectApp='/Applications/Jamf Connect.app'
 readonly logPath='/var/log/updateInventory.log'
@@ -116,6 +116,7 @@ function main() {
 
     sleep 1
 
+    currentName=$(/usr/sbin/scutil --get LocalHostName)
     log_Message "Checking for correct naming"
     if ! check_Name;
     then
