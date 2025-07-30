@@ -141,7 +141,7 @@ OOP
     fi
 }
 
-# Seperate dialog list for lab devices
+# Separate dialog list for lab devices
 function lab_Prompt(){
     log_Message "User chose: \"Lab Device\""
     chosenLab=$(osascript <<OOP
