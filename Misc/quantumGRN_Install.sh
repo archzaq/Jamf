@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 08-01-25  ###
 ### Updated: 08-05-25  ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -312,7 +312,7 @@ function edit_TweedledumFiles() {
             log_Message "Removing [project] section from: \"$tweedledumPyprojectFile\""
             sed -i '' -e '/^\[project\].*/d' "$tweedledumPyprojectFile"
         fi
-
+        
         if grep -q '^requires-python = ' "$tweedledumPyprojectFile";
         then
             log_Message "Removing requires-python line from: \"$tweedledumPyprojectFile\""
@@ -323,7 +323,7 @@ function edit_TweedledumFiles() {
         alert_Dialog "Unable to locate ${tweedledumPyprojectFile}"
         return 1
     fi
-
+    
     for file in "${cmakeListsArray[@]}";
     do
         if [[ -f "$file" ]];
@@ -517,7 +517,7 @@ function main() {
         log_Message "ERROR: Exiting at pre-check"
         exit 1
     fi
-    
+
     log_Message "Completed pre-checks, starting QuantumGRN installation"
 
     if ! brew_PackageInstall;
@@ -574,7 +574,7 @@ function main() {
         alert_Dialog "Unable to install Tweedledum using pip"
         exit 1
     fi
-    
+
     log_Message "Installing QuantumGRN to myqgrn conda env"
     if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN";
     then
