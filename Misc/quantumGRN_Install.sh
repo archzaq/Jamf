@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 08-01-25  ###
 ### Updated: 08-05-25  ###
-### Version: 1.0       ###
+### Version: 1.1       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -81,8 +81,8 @@ function icon_Check() {
     return 0
 }
 
-# Ensure Xcode CLI tools, Homebrew, and Anaconda are installed
-function preCheck_Device() {
+# Install Xcode CLI tools
+function install_XCodeCLI() {
     if xcode-select -p &>/dev/null;
     then
         log_Message "Xcode command line tools installed"
@@ -100,7 +100,11 @@ function preCheck_Device() {
             return 1
         fi
     fi
-    
+    return 0 
+}
+
+# Check for Homebrew and install if unavailable
+function install_HomebrewPKG() {
     if [[ "$deviceArch" == 'arm64' ]];
     then
         homebrewPrefix='/opt/homebrew'
@@ -172,9 +176,13 @@ function preCheck_Device() {
     then
         log_Message "ERROR: Unable to locate Homebrew"
         alert_Dialog "Unable to locate Homebrew"
-        exit 1
+        return 1
     fi
-    
+    return 0
+}
+
+# Check for Conda and install if unavailable
+function install_Conda() {
     if command -v conda &>/dev/null;
     then
         log_Message "Conda installed"
@@ -230,7 +238,11 @@ function preCheck_Device() {
             fi
         fi
     fi
-    
+    return 0
+}
+
+# Download tweedledum version 1.1.1
+function download_Tweedledum() {
     if [[ ! -d "$tweedledumInstallPath" ]];
     then
         if git clone --branch v1.1.1 --depth 1 https://github.com/boschmitt/tweedledum.git "$tweedledumInstallPath";
@@ -263,6 +275,31 @@ function preCheck_Device() {
             log_Message "Tweedledum version 1.1.1 present"
         fi
     fi
+    return 0
+}
+
+# Ensure Xcode CLI tools, Homebrew, and Anaconda are installed
+function preCheck_Device() {
+    if ! install_XCodeCLI;
+    then
+        return 1
+    fi
+    
+    if ! install_HomebrewPKG;
+    then
+        return 1
+    fi
+    
+    if ! install_Conda;
+    then
+        return 1
+    fi
+    
+    if ! download_Tweedledum;
+    then
+        return 1
+    fi
+    
     return 0
 }
 
