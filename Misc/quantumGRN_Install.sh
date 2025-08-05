@@ -496,7 +496,7 @@ OOP
 function main() {
     /usr/bin/caffeinate -d &
     caffeinatePID=$!
-    trap "kill $caffeinatePID" EXIT
+    trap "kill $caffeinatePID" EXIT INT TERM
     
     if ! create_InstallDir;
     then
