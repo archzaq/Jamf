@@ -2,51 +2,72 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 8-27-24   ###
-### Updated: 9-24-24   ###
-### Version: 1.2       ###
+### Created: 08-27-24  ###
+### Updated: 08-11-25  ###
+### Version: 2.0       ###
 ##########################
 
-managementAccount="$4"
-managementAccountPass="$5"
-elevatedAccount="$6"
 elevatedAccountPass=""
-elevatedAccountPassVerify=""
-currentUserPassword=""
-readonly elevatedAccountPath="/Users/$elevatedAccount"
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-readonly logPath='/var/log/elevatedAccount.log'
-readonly iconPath='/usr/local/jamfconnect/SLU.icns'
+readonly logFile='/var/log/elevatedAccount_Creation.log'
+readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
+readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='SLU ITS: Elevated Account Creation'
 
-# Check for SLU icon file, applescript dialog boxes will error without it
-function icon_Check() {
-    if [[ ! -f "$iconPath" ]];
+# Append current status to log file
+function log_Message() {
+    local timestamp="$(date "+%F %T")"
+    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
+}
+
+# Ensure external arguments are passed
+function arg_Check() {
+    if [[ -z "$managementAccount" ]] || [[ -z "$managementAccountPass" ]] || [[ -z "$elevatedAccount" ]]; 
     then
-        echo "Log: $(date "+%F %T") No SLU icon found, attempting install." | tee -a "$logPath"
-        /usr/local/bin/jamf policy -event SLUFonts
-        if [[ ! -f "$iconPath" ]];
+        log_Message "ERROR: Missing critical arguments"
+        return 1
+    fi
+    return 0
+}
+
+# Check for valid icon file, AppleScript dialog boxes will error without it
+function icon_Check() {
+    activeIcon="$SLUIconFile"
+    if [[ ! -f "$activeIcon" ]];
+    then
+        log_Message "No SLU icon found"
+        if [[ -f '/usr/local/bin/jamf' ]];
         then
-            echo "Log: $(date "+%F %T") No SLU icon found, exiting." | tee -a "$logPath"
-            return 1
+            log_Message "Attempting icon install via Jamf"
+            /usr/local/bin/jamf policy -event SLUFonts
+        else
+            log_Message "No Jamf binary found"
         fi
+        if [[ ! -f "$activeIcon" ]];
+        then
+            if [[ -f "$genericIconFile" ]];
+            then
+                log_Message "Generic icon found"
+                activeIcon="$genericIconFile"
+            else
+                log_Message "ERROR: Generic icon not found"
+                return 1
+            fi
+        fi
+    else
+        log_Message "SLU icon found"
     fi
     return 0
 }
 
 # Check if someone is logged into the device
 function login_Check() {
-    local account="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-    if [[ "$account" == 'root' ]];
+    if [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == 'root' ]];
     then
-        echo "Log: $(date "+%F %T") \"$account\" currently logged in." | tee -a "$logPath"
-        return 1
-    elif [[ "$account" == 'loginwindow' ]] || [[ -z "$account" ]];
-    then
-        echo "Log: $(date "+%F %T") No one logged in." | tee -a "$logPath"
+        log_Message "No one currently logged in"
         return 1
     else
-        echo "Log: $(date "+%F %T") \"$account\" currently logged in." | tee -a "$logPath"
+        log_Message "${currentUser} currently logged in"
         return 0
     fi
 }
@@ -54,258 +75,329 @@ function login_Check() {
 # Check if account exists
 function account_Check() {
     local account="$1"
-    if /usr/bin/id "$account" &>/dev/null;
-    then
-        echo "Log: $(date "+%F %T") \"$account\" exists." | tee -a "$logPath"
-        return 0
-    else
-        echo "Log: $(date "+%F %T") \"$account\" does not exist." | tee -a "$logPath"
-        return 1
-    fi
+    /usr/bin/id "$account" &>/dev/null
+    return $?
 }
 
 # Check if account is in the admin group
 function admin_Check(){
     local account="$1"
-    local groupList=$(/usr/bin/groups "$account")
-    if [[ $groupList == *" admin "* ]];
-    then
-        echo "Log: $(date "+%F %T") \"$account\" is an admin." | tee -a "$logPath"
-        return 0
-    else
-        echo "Log: $(date "+%F %T") \"$account\" is not an admin." | tee -a "$logPath"
-        return 1
-    fi
+    /usr/sbin/dseditgroup -o checkmember -m "$account" admin &>/dev/null
+    return $?
 }
 
-# Prompt the user for their password, reprompting if they enter nothing
-function password_Prompt(){
-    local phrase="$1"
-    local readonly passwordTitle='SLU ITS: Password Prompt'
-    echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
-    currentUserPassword=$(/usr/bin/osascript <<OOP
-        set currentUserPassword to (display dialog "$phrase" buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file "$iconPath" with title "$passwordTitle" giving up after 900)
-        if button returned of currentUserPassword is equal to "OK" then
-            return text returned of currentUserPassword
-        else
-            return "timeout"
-        end if
-OOP
-    )
-    if [[ $? != 0 ]];
-    then
-        echo "Log: $(date "+%F %T") User selected cancel." | tee -a "$logPath"
-        return 1
-    elif [[ -z "$currentUserPassword" ]];
-    then
-        echo "Log: $(date "+%F %T") No password entered." | tee -a "$logPath"
-        /usr/bin/osascript -e "display dialog \"Error! You did not enter a password. Please try again.\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$iconPath\" with title \"$passwordTitle\""
-        password_Prompt "$phrase"
-    elif [[ "$currentUserPassword" == 'timeout' ]];
-    then
-        echo "Log: $(date "+%F %T") Timed out." | tee -a "$logPath"
-        password_Prompt "$phrase"
-    fi
-    echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
-    return 0
+# Check account for Secure Token
+function token_Check() {
+    local account="$1"
+    /usr/sbin/sysadminctl -secureTokenStatus "$account" 2>&1 | grep -q 'ENABLED'
+    return $?
 }
 
 # Creates account with a home folder and proper permissions
-function create_Account() {
+function create_AdminAccount() {
     local accountAdd="$1"
     local accountAddPass="$2"
     local accountAddPath="$3"
-    local managementAccount="$4"
-    local managementAccountPass="$5"
-    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$managementAccount" -adminPassword "$managementAccountPass";
+    local adminAccount="$4"
+    local adminPass="$5"
+    if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPass" &>/dev/null;
     then
-        echo "Log: $(date "+%F %T") \"$accountAdd\" created." | tee -a "$logPath"
+        log_Message "$accountAdd created"
         if account_Check "$accountAdd";
         then
-            dirs=("Desktop" "Documents" "Downloads" "Library" "Movies" "Music" "Pictures" "Public")
+            dirs=("Applications" "Desktop" "Documents" "Downloads" "Movies" "Music" "Pictures" "Public")
             for dir in "${dirs[@]}";
             do
                 mkdir -p "$accountAddPath/$dir"
+                chown "$accountAdd":staff "$accountAddPath/$dir"
+                chmod 750 "$accountAddPath/$dir"
             done
             chown -R "$accountAdd":staff "$accountAddPath"
-            chmod -R 750 "$accountAddPath"
-            chmod -R +a "group:everyone deny delete" "$accountAddPath"
-            echo "Log: $(date "+%F %T") \"$accountAdd\" successfully configured." | tee -a "$logPath"
+            chmod 750 "$accountAddPath"
+            log_Message "$accountAdd successfully configured"
             return 0
         else
-            echo "Log: $(date "+%F %T") \"$accountAdd\" failed to be configured." | tee -a "$logPath"
-            return 1
+            log_Message "$accountAdd failed to be configured"
         fi
     else
-        echo "Log: $(date "+%F %T") \"$accountAdd\" could not be created." | tee -a "$logPath"
-        return 1
+        log_Message "$accountAdd could not be created"
     fi
+    return 1
 }
 
-# Check user account for volume ownership
-function check_Ownership() {
-    local account="$1"
-    local volumeOwner=false
-    local accountGUID=$(/usr/bin/dscl . -read /Users/$account GeneratedUID | awk '{print $2}')
-    local systemVolume=$(/usr/sbin/diskutil info / | grep "Volume Name" | sed 's/.*: //' | sed 's/^ *//')
-    local systemVolumePath="/Volumes/$systemVolume"
-    echo "Log: $(date "+%F %T") Checking \"$account\" for volume ownership." | tee -a "$logPath"
-    for id in $(/usr/sbin/diskutil apfs listUsers "$systemVolumePath" | grep -E '.*-.*' | awk '{print $2}');
-    do
-        if [[ "$id" == "$accountGUID" ]];
-        then
-            echo "Log: $(date "+%F %T") \"$account\" is a volume owner." | tee -a "$logPath"
-            volumeOwner=true
-            return 0
-        fi
-    done
-    if [[ "$volumeOwner" != true ]];
-    then
-        echo "Log: $(date "+%F %T") \"$account\" is not a volume owner." | tee -a "$logPath"
-        return 1
-    fi
-}
-
-# Assigns secure token to current user using management account
+# Assigns Secure Token to an account
 function assign_Token(){
-    # Test the sysadminctl command for a success before actually attempting to grant a secure token
-    local secureTokenTest=$(/usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword" -test 2>&1)
-    if [[ $secureTokenTest == *"Done"* ]];
+    local adminAccount="$1"
+    local adminPass="$2"
+    local tokenEnableAccount="$3"
+    local tokenEnablePass="$4"
+    local output
+    output=$(/usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPass" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePass" 2>&1)
+    if token_Check "$tokenEnableAccount";
     then
-        /usr/sbin/sysadminctl -adminUser "$managementAccount" -adminPassword "$managementAccountPass" -secureTokenOn "$currentUser" -password "$currentUserPassword"
-        echo "Log: $(date "+%F %T") Success assigning secure token!" | tee -a "$logPath"
         return 0
     else
-        echo "Log: $(date "+%F %T") Error with sysadminctl command." | tee -a "$logPath"
+        log_Message "ERROR: Change failed, sysadminctl output: $output"
         return 1
     fi
+}
+
+# Ensure password complexity
+function validate_Password() {
+    local password="$1"
+    local minLength=10
+    
+    if [[ ${#password} -lt $minLength ]];
+    then
+        alert_Dialog "Weak Password" "Password must be at least $minLength characters"
+        return 1
+    fi
+    
+    if ! [[ "$password" =~ [0-9] ]] || ! [[ "$password" =~ [A-Z] ]] || ! [[ "$password" =~ [a-z] ]];
+    then
+        alert_Dialog "Weak Password" "Password must contain uppercase, lowercase, and numbers"
+        return 1
+    fi
+    return 0
+}
+
+# Secure credential handling - zero out memory after use
+function secure_Cleanup() {
+    # Overwrite variables multiple times before unsetting
+    for var in managementAccountPass elevatedAccountPass elevatedAccountPassTest; do
+        eval "$var=$(openssl rand -base64 32)"
+        eval "$var=''"
+        unset $var
+    done
+}
+
+# AppleScript - Text field dialog prompt for inputting information
+function textField_Dialog() {
+    local promptString="$1"
+    local dialogType="$2"
+    local count=1
+    while [ $count -le 10 ];
+    do
+        textFieldDialog=$(/usr/bin/osascript <<OOP
+        try
+            set promptString to "$promptString"
+            set iconFile to "$activeIcon"
+            set dialogTitle to "$dialogTitle"
+            set dialogType to "$dialogType"
+            if dialogType is "hidden" then
+                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file iconFile with title dialogTitle giving up after 900
+            else
+                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with answer default answer "" with icon POSIX file iconFile with title dialogTitle giving up after 900
+            end if
+            set buttonChoice to button returned of dialogResult
+            if buttonChoice is equal to "OK" then
+                return text returned of dialogResult
+            else
+                return "timeout"
+            end if
+        on error
+            return "Cancel"
+        end try
+OOP
+        )
+        case "$textFieldDialog" in
+            'Cancel')
+                log_Message "User responded with: $textFieldDialog"
+                return 1
+                ;;
+            'timeout')
+                log_Message "No response, re-prompting ($count/10)"
+                ((count++))
+                ;;
+            '')
+                log_Message "Nothing entered in text field"
+                alert_Dialog "An Error Has Occurred" "Please enter something or select cancel."
+                ;;
+            *)
+                if [[ "$dialogType" == 'hidden' ]];
+                then
+                    log_Message "Continued"
+                else
+                    log_Message "User responded with: $textFieldDialog"
+                fi
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# AppleScript - Create alert dialog window
+function alert_Dialog() {
+    local alertTitle="$1"
+    local alertMessage="$2"
+    log_Message "Displaying alert dialog"
+    alertDialog=$(/usr/bin/osascript <<OOP
+    try
+        set alertTitle to "$alertTitle"
+        set alertMessage to "$alertMessage"
+        set choice to (display alert alertTitle message alertMessage as critical buttons "OK" default button 1 giving up after 900)
+        if (gave up of choice) is true then
+            return "TIMEOUT"
+        else
+            return (button returned of choice)
+        end if
+    on error
+        return "ERROR"
+    end try
+OOP
+    )
+    case "$alertDialog" in
+        'ERROR')
+            log_Message "Unable to show alert dialog"
+            ;;
+        'TIMEOUT')
+            log_Message "Alert timed out"
+            ;;
+        *)
+            log_Message "Continued through alert dialog"
+            ;;
+    esac
+}
+
+function cleanup_Env() {
+    managementAccountPass=''
+    elevatedAccountPass=''
+    elevatedAccountPassTest=''
+    unset managementAccountPass
+    unset elevatedAccountPass
+    unset elevatedAccountPassTest
 }
 
 function main() {
-    echo "Log: $(date "+%F %T") Beginning elevated account script." | tee "$logPath"
+    trap "cleanup_Env" EXIT INT TERM
+    printf "Log: $(date "+%F %T") Beginning Elevated Account Creation script\n" | tee "$logFile"
 
-    # Check for SLU icon file
-    echo "Log: $(date "+%F %T") Checking for SLU icon." | tee -a "$logPath"
+    if ! arg_Check;
+    then
+        log_Message "Exiting at argument check"
+        exit 1
+    fi
+
+    log_Message "Checking for SLU icon"
     if ! icon_Check;
     then
-        echo "Log: $(date "+%F %T") Exiting for no SLU icon." | tee -a "$logPath"
+        log_Message "Exiting at icon check"
         exit 1
     fi
-    echo "Log: $(date "+%F %T") Check for SLU icon complete." | tee -a "$logPath"
 
-
-
-    # Check for valid user being logged in
-    echo "Log: $(date "+%F %T") Checking for currently logged in user." | tee -a "$logPath"
+    log_Message "Checking for currently logged in user"
     if ! login_Check;
     then
-        echo "Log: $(date "+%F %T")Exiting for invalid user logged in." | tee -a "$logPath"
+        log_Message "Exiting at login check"
         exit 1
     fi
-    echo "Log: $(date "+%F %T") Check for currently logged in user complete." | tee -a "$logPath"
 
-
-
-    # Check if management account exists
-    echo "Log: $(date "+%F %T") Checking for \"$managementAccount\"." | tee -a "$logPath"
+    log_Message "Checking for: \"$managementAccount\""
     if ! account_Check "$managementAccount";
     then
-        echo "Log: $(date "+%F %T")Management account does not exist, exiting." | tee -a "$logPath"
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account does not exist. Unable to proceed with account creation." as critical buttons {"OK"} default button "OK" giving up after 900'
+        log_Message "ERROR: Management account does not exist, exiting"
+        alert_Dialog "Missing Account" "${managementAccount} account does not exist!"
         exit 1
     fi
-    echo "Log: $(date "+%F %T") Check for \"$managementAccount\" complete." | tee -a "$logPath"
 
-
-
-    # Check if elevate account exists
-    echo "Log: $(date "+%F %T") Checking for \"$elevatedAccount\"." | tee -a "$logPath"
+    log_Message "Checking for: \"$elevatedAccount\""
     if account_Check "$elevatedAccount";
     then
-        echo "Log: $(date "+%F %T") Elevate account already exists, exiting." | tee -a "$logPath"
+        log_Message "ERROR: Elevated account already exists, exiting"
+        alert_Dialog "Duplicate Account" "${elevatedAccount} account already exists!"
         exit 1
     fi
-    echo "Log: $(date "+%F %T") Check for \"$elevatedAccount\" complete." | tee -a "$logPath"
 
-
-
-    # Check if management account is an admin
-    echo "Log: $(date "+%F %T") Checking for \"$managementAccount\" to be an admin." | tee -a "$logPath"
+    log_Message "Checking admin rights for: \"$managementAccount\""
     if ! admin_Check "$managementAccount";
     then
-        echo "Log: $(date "+%F %T")Management account is not an admin, exiting." | tee -a "$logPath"
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Management account is not an admin. Unable to proceed with account creation." as critical buttons {"OK"} default button "OK" giving up after 900'
+        log_Message "ERROR: Management account is not an admin, exiting"
+        alert_Dialog "Insufficient Permissions" "${managementAccount} account is not an admin!"
         exit 1
     fi
-    echo "Log: $(date "+%F %T") Check for \"$managementAccount\" to be an admin complete." | tee -a "$logPath"
 
-
-
-    # Prompt user for elevated account password
-    echo "Log: $(date "+%F %T") Prompting user for elevated account password." | tee -a "$logPath"
-    if ! password_Prompt "Please enter the password you would like to use for your admin account:";
-    then
-        echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
-        exit 1
-    fi
-    elevatedAccountPass=${currentUserPassword}
-    echo "Log: $(date "+%F %T") Prompting user again for elevated account password." | tee -a "$logPath"
-    if ! password_Prompt "Please verify the password you would like to use for your admin account:";
-    then
-        echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
-        exit 1
-    fi
-    elevatedAccountPassVerify=${currentUserPassword}
-    if [ "$elevatedAccountPass" = "$elevatedAccountPassVerify" ];
-    then
-        echo "Log: $(date "+%F %T") Passwords matched, continuing." | tee -a "$logPath"
-    else
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "Passwords did not match, exiting." as critical buttons {"OK"} default button "OK" giving up after 900'
-        exit 1
-    fi
-    echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
-
-
-
-    # Attempt to create elevated account using management account
-    echo "Log: $(date "+%F %T") Creating elevated account." | tee -a "$logPath"
-    if ! create_Account "$elevatedAccount" "$elevatedAccountPass" "$elevatedAccountPath" "$managementAccount" "$managementAccountPass";
-    then
-        echo "Log: $(date "+%F %T") Exiting at account creation." | tee -a "$logPath"
-        /usr/bin/osascript -e 'display alert "An error has occurred" message "There was an issue with the account creation. Unable to proceed." as critical buttons {"OK"} default button "OK" giving up after 900'
-        exit 1
-    fi
-    echo "Log: $(date "+%F %T") Creation of elevated account complete." | tee -a "$logPath"
-
-
-
-    # Check user for secure token, assign one using management account, if possible
-    if ! check_Ownership "$currentUser";
-    then
-        if check_Ownership "$managementAccount";
+    validPass=false
+    while [[ "$validPass" == false ]];
+    do
+        log_Message "Prompting user for elevated account pass"
+        if ! textField_Dialog "Please enter the password you would like to use for your admin account:" "hidden";
         then
-            echo "Log: $(date "+%F %T") Attempting to assign secure token to \"$currentUser\" using the management account." | tee -a "$logPath"
-            echo "Log: $(date "+%F %T") Prompting user for their password." | tee -a "$logPath"
-            if ! password_Prompt "Please enter your computer password:";
-            then
-                echo "Log: $(date "+%F %T") Exiting at password prompt." | tee -a "$logPath"
-                exit 1
-            fi
-            echo "Log: $(date "+%F %T") Password prompt finished." | tee -a "$logPath"
-
-            # Attempt to assign secure token
-            if ! assign_Token;
-            then
-                echo "Log: $(date "+%F %T") Management account unable to grant a secure token, exiting." | tee -a "$logPath"
-            fi
+            log_Message "Exiting at password prompt"
+            exit 0
         else
-            echo "Log: $(date "+%F %T") Management account does not have volume ownership, exiting." | tee -a "$logPath"
+            elevatedAccountPass="${textFieldDialog}"
+            textFieldDialog=''
+            unset textFieldDialog
+            if validate_Password "$elevatedAccountPass";
+            then
+                log_Message "Password sufficiently complex"
+                if ! textField_Dialog "Verify the password by entering it again:" "hidden";
+                then
+                    log_Message "Exiting at password verification"
+                    exit 0
+                else
+                    elevatedAccountPassTest="${textFieldDialog}"
+                    textFieldDialog=''
+                    unset textFieldDialog
+                fi
+
+                if [[ "$elevatedAccountPass" == "$elevatedAccountPassTest" ]];
+                then
+                    log_Message "Passwords match"
+                    elevatedAccountPassTest=''
+                    unset elevatedAccountPassTest
+                    validPass=true
+                else
+                    log_Message "ERROR: Passwords do not match"
+                    alert_Dialog "Password Error" "Passwords do not match!"
+                fi
+            fi
+        fi
+    done
+
+    log_Message "Creating elevated account"
+    elevatedAccountPath="/Users/${elevatedAccount}"
+    if ! create_AdminAccount "$elevatedAccount" "$elevatedAccountPass" "$elevatedAccountPath" "$managementAccount" "$managementAccountPass";
+    then
+        log_Message "Exiting at account creation"
+        alert_Dialog "Account Creation Error" "Unable to complete account creation!"
+        exit 1
+    fi
+
+    if ! token_Check "$elevatedAccount";
+    then
+        log_Message "Secure Token not assigned"
+        if token_Check "$managementAccount";
+        then
+            log_Message "${managementAccount} has Secure Token"
+            if ! assign_Token "$managementAccount" "$managementAccountPass" "$elevatedAccount" "$elevatedAccountPass";
+            then
+                log_Message "ERROR: Unable to assign Secure Token to ${elevatedAccount}"
+            else
+                log_Message "Secure Token successfully assigned!"
+            fi
         fi
     fi
-
-    echo "Log: $(date "+%F %T") Elevated account creation finished! Exiting." | tee -a "$logPath"
+    elevatedAccountPass=''
+    managementAccountPass=''
+    unset elevatedAccountPass
+    unset managementAccountPass
+    
+    log_Message "Elevated account creation finished! Exiting"
     exit 0
 }
+
+if [[ -f "/usr/local/jamf/bin/jamf" ]];
+then
+    managementAccount="$4"
+    managementAccountPass="$5"
+    elevatedAccount="$6"
+else
+    managementAccount="$1"
+    managementAccountPass="$2"
+    elevatedAccount="$3"
+fi
 
 main
 
