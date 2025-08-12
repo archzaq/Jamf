@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
 ### Updated: 08-11-25  ###
-### Version: 3.2       ###
+### Version: 3.3       ###
 ##########################
 
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
@@ -78,7 +78,7 @@ function main() {
 
     sleep 1
 
-    log_Message "Checking for remaining standard policies"
+    log_Message "Checking for policies with Jamf Policy"
     policyCheckResult=$(/usr/local/bin/jamf policy)
     if ! check_PolicyStatus "$policyCheckResult";
     then
@@ -113,7 +113,6 @@ function main() {
         else
             log_Message "Rosetta runtime present"
         fi
-        log_Message "Rosetta runtime check complete"
     fi
 
     sleep 1
@@ -127,14 +126,13 @@ function main() {
     else
         log_Message "Device name, \"$currentName\", fits naming scheme"
     fi
-    log_Message "Name check complete"
 
     sleep 1
 
     log_Message "Checking for Jamf Connect"
     if [[ ! -d "$jamfConnectApp" ]] || [[ ! -f "$jamfConnectPLIST" ]];
     then
-        log_Message "Missing Jamf Connect, installing"
+        log_Message "Missing Jamf Connect, attempting install"
         /usr/local/bin/jamf policy -event MissingJamfConnect
     else
         log_Message "Jamf Connect already installed"
