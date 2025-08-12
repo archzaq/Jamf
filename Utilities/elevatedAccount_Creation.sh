@@ -3,10 +3,13 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
-### Updated: 08-11-25  ###
+### Updated: 08-12-25  ###
 ### Version: 2.0       ###
 ##########################
 
+managementAccount="$4"
+managementAccountPass="$5"
+elevatedAccount="$6"
 elevatedAccountPass=""
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly logFile='/var/log/elevatedAccount_Creation.log'
@@ -67,7 +70,7 @@ function login_Check() {
         log_Message "No one currently logged in"
         return 1
     else
-        log_Message "${currentUser} currently logged in"
+        log_Message "Currently logged in: \"${currentUser}\""
         return 0
     fi
 }
@@ -102,7 +105,7 @@ function create_AdminAccount() {
     local adminPass="$5"
     if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPass" &>/dev/null;
     then
-        log_Message "$accountAdd created"
+        log_Message "Successfully created account: \"${accountAdd}\""
         if account_Check "$accountAdd";
         then
             dirs=("Applications" "Desktop" "Documents" "Downloads" "Movies" "Music" "Pictures" "Public")
@@ -114,13 +117,13 @@ function create_AdminAccount() {
             done
             chown -R "$accountAdd":staff "$accountAddPath"
             chmod 750 "$accountAddPath"
-            log_Message "$accountAdd successfully configured"
+            log_Message "Successfully configured: \"${accountAdd}\""
             return 0
         else
-            log_Message "$accountAdd failed to be configured"
+            log_Message "ERROR: Failed to configure: \"${accountAdd}\""
         fi
     else
-        log_Message "$accountAdd could not be created"
+        log_Message "ERROR: Failed to create: \"${accountAdd}\""
     fi
     return 1
 }
@@ -137,7 +140,7 @@ function assign_Token(){
     then
         return 0
     else
-        log_Message "ERROR: Change failed, sysadminctl output: $output"
+        log_Message "ERROR: Assign token failed, sysadminctl output: $output"
         return 1
     fi
 }
@@ -146,29 +149,17 @@ function assign_Token(){
 function validate_Password() {
     local password="$1"
     local minLength=10
-    
     if [[ ${#password} -lt $minLength ]];
     then
         alert_Dialog "Weak Password" "Password must be at least $minLength characters"
         return 1
     fi
-    
     if ! [[ "$password" =~ [0-9] ]] || ! [[ "$password" =~ [A-Z] ]] || ! [[ "$password" =~ [a-z] ]];
     then
         alert_Dialog "Weak Password" "Password must contain uppercase, lowercase, and numbers"
         return 1
     fi
     return 0
-}
-
-# Secure credential handling - zero out memory after use
-function secure_Cleanup() {
-    # Overwrite variables multiple times before unsetting
-    for var in managementAccountPass elevatedAccountPass elevatedAccountPassTest; do
-        eval "$var=$(openssl rand -base64 32)"
-        eval "$var=''"
-        unset $var
-    done
 }
 
 # AppleScript - Text field dialog prompt for inputting information
@@ -202,7 +193,7 @@ OOP
         )
         case "$textFieldDialog" in
             'Cancel')
-                log_Message "User responded with: $textFieldDialog"
+                log_Message "User responded with: \"${textFieldDialog}\""
                 return 1
                 ;;
             'timeout')
@@ -211,14 +202,14 @@ OOP
                 ;;
             '')
                 log_Message "Nothing entered in text field"
-                alert_Dialog "An Error Has Occurred" "Please enter something or select cancel."
+                alert_Dialog "An Error Has Occurred" "Please enter something or select cancel"
                 ;;
             *)
                 if [[ "$dialogType" == 'hidden' ]];
                 then
-                    log_Message "Continued"
+                    log_Message "Continued through prompt"
                 else
-                    log_Message "User responded with: $textFieldDialog"
+                    log_Message "User responded with: \"${textFieldDialog}\""
                 fi
                 return 0
                 ;;
@@ -279,7 +270,7 @@ function main() {
         exit 1
     fi
 
-    log_Message "Checking for SLU icon"
+    log_Message "Checking for icon file"
     if ! icon_Check;
     then
         log_Message "Exiting at icon check"
@@ -309,7 +300,7 @@ function main() {
         exit 1
     fi
 
-    log_Message "Checking admin rights for: \"$managementAccount\""
+    log_Message "Checking permissions for: \"$managementAccount\""
     if ! admin_Check "$managementAccount";
     then
         log_Message "ERROR: Management account is not an admin, exiting"
@@ -320,10 +311,10 @@ function main() {
     validPass=false
     while [[ "$validPass" == false ]];
     do
-        log_Message "Prompting user for elevated account pass"
+        log_Message "Prompting user for elevated account INFO"
         if ! textField_Dialog "Please enter the password you would like to use for your admin account:" "hidden";
         then
-            log_Message "Exiting at password prompt"
+            log_Message "Exiting at INFO prompt"
             exit 0
         else
             elevatedAccountPass="${textFieldDialog}"
@@ -331,10 +322,11 @@ function main() {
             unset textFieldDialog
             if validate_Password "$elevatedAccountPass";
             then
-                log_Message "Password sufficiently complex"
+                log_Message "INFO sufficiently complex"
+                log_Message "Prompting user to verify INFO"
                 if ! textField_Dialog "Verify the password by entering it again:" "hidden";
                 then
-                    log_Message "Exiting at password verification"
+                    log_Message "Exiting at INFO verification"
                     exit 0
                 else
                     elevatedAccountPassTest="${textFieldDialog}"
@@ -344,19 +336,19 @@ function main() {
 
                 if [[ "$elevatedAccountPass" == "$elevatedAccountPassTest" ]];
                 then
-                    log_Message "Passwords match"
+                    log_Message "INFO match, continuing"
                     elevatedAccountPassTest=''
                     unset elevatedAccountPassTest
                     validPass=true
                 else
-                    log_Message "ERROR: Passwords do not match"
+                    log_Message "ERROR: INFO do not match"
                     alert_Dialog "Password Error" "Passwords do not match!"
                 fi
             fi
         fi
     done
 
-    log_Message "Creating elevated account"
+    log_Message "Creating account: \"${elevatedAccount}\""
     elevatedAccountPath="/Users/${elevatedAccount}"
     if ! create_AdminAccount "$elevatedAccount" "$elevatedAccountPass" "$elevatedAccountPath" "$managementAccount" "$managementAccountPass";
     then
@@ -367,37 +359,31 @@ function main() {
 
     if ! token_Check "$elevatedAccount";
     then
-        log_Message "Secure Token not assigned"
+        log_Message "Secure Token not assigned to: \"${elevatedAccount}\""
         if token_Check "$managementAccount";
         then
-            log_Message "${managementAccount} has Secure Token"
+            log_Message "Secure Token present for: \"${managementAccount}\""
             if ! assign_Token "$managementAccount" "$managementAccountPass" "$elevatedAccount" "$elevatedAccountPass";
             then
-                log_Message "ERROR: Unable to assign Secure Token to ${elevatedAccount}"
+                log_Message "ERROR: Unable to assign Secure Token to: \"${elevatedAccount}\""
             else
-                log_Message "Secure Token successfully assigned!"
+                log_Message "Secure Token successfully assigned to: \"${elevatedAccount}\""
             fi
+        else
+            log_Message "ERROR: \"${managementAccount}\" does not have a Secure Token to assign to \"${elevatedAccount}\""
         fi
+    else
+        log_Message "Secure Token already assigned to: \"${elevatedAccount}\""
     fi
     elevatedAccountPass=''
     managementAccountPass=''
     unset elevatedAccountPass
     unset managementAccountPass
     
-    log_Message "Elevated account creation finished! Exiting"
+    /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$activeIcon"'" with title "'"$dialogTitle"'"'
+    log_Message "Elevated Account Creation finished! Exiting"
     exit 0
 }
-
-if [[ -f "/usr/local/jamf/bin/jamf" ]];
-then
-    managementAccount="$4"
-    managementAccountPass="$5"
-    elevatedAccount="$6"
-else
-    managementAccount="$1"
-    managementAccountPass="$2"
-    elevatedAccount="$3"
-fi
 
 main
 
