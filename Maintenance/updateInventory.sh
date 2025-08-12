@@ -3,11 +3,10 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 07-30-25  ###
-### Version: 3.1       ###
+### Updated: 08-11-25  ###
+### Version: 3.2       ###
 ##########################
 
-currentName=$(/usr/sbin/scutil --get LocalHostName)
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
 readonly jamfConnectApp='/Applications/Jamf Connect.app'
 readonly logPath='/var/log/updateInventory.log'
@@ -47,13 +46,14 @@ function check_PolicyStatus() {
 
 # Return false if the current device name doesnt fit naming scheme
 function check_Name() {
-    if [[ "$currentName" == *"Mac"* ]] || [[ "$currentName" == "SLU-"* ]];
+    local name="$1"
+    if [[ "$name" == *"Mac"* ]] || [[ "$name" == "SLU-"* ]];
     then
         return 1
-    elif [[ "$currentName" == *-*-* ]];
+    elif [[ "$name" == *-*-* ]];
     then
         return 0
-    elif [[ "$currentName" == *"-"* ]];
+    elif [[ "$name" == *"-"* ]];
     then
         return 0
     else
@@ -64,8 +64,8 @@ function check_Name() {
 function main() {
     /usr/bin/caffeinate -d &
     CAFFEINATE_PID=$!
-    trap "kill $CAFFEINATE_PID" EXIT
-    printf "Log: $(date "+%F %T") Beginning Update Inventory script.\n" | tee "$logPath"
+    trap "kill $CAFFEINATE_PID" EXIT INT TERM
+    printf "Log: $(date "+%F %T") Beginning Update Inventory script\n" | tee "$logPath"
 
     log_Message "Checking for lingering enrollment policies"
     enrollmentCheckResult=$(/usr/local/bin/jamf policy -event enrollmentComplete)
@@ -89,24 +89,26 @@ function main() {
 
     sleep 1
 
-    log_Message "Updating inventory"
-    /usr/local/bin/jamf recon
+    log_Message "Updating inventory with Jamf Recon"
+    /usr/local/bin/jamf recon 1>/dev/null
     log_Message "Inventory update complete"
 
     if [[ $(/usr/bin/uname -p) = 'arm' ]];
     then
         log_Message "Checking for Rosetta runtime"
-        if [[ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]];
+        if [[ ! -f '/Library/Apple/usr/libexec/oah/libRosettaRuntime' ]];
         then
             log_Message "Rosetta runtime not present, installing Rosetta"
             /usr/sbin/softwareupdate --install-rosetta --agree-to-license
             sleep 1
             log_Message "Checking for other missing enrollment policies"
             /usr/local/bin/jamf policy -event enrollmentComplete
-            if [ ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ];
+            if [ ! -f '/Library/Apple/usr/libexec/oah/libRosettaRuntime' ];
             then
-                log_Message "Rosetta runtime still not present, trying install again"
+                log_Message "Rosetta runtime still not found, trying install again then continuing regardless"
                 /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            else
+                log_Message "Rosetta runtime found"
             fi
         else
             log_Message "Rosetta runtime present"
@@ -118,7 +120,7 @@ function main() {
 
     currentName=$(/usr/sbin/scutil --get LocalHostName)
     log_Message "Checking for correct naming"
-    if ! check_Name;
+    if ! check_Name "$currentName";
     then
         log_Message "Device name, \"$currentName\", does not fit naming scheme"
         /usr/local/bin/jamf policy -event rename
