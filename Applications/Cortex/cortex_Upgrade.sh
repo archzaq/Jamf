@@ -3,16 +3,21 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-18-25  ###
-### Updated: 08-18-25  ###
-### Version: 1.0       ###
+### Updated: 08-20-25  ###
+### Version: 1.1       ###
 ##########################
 
 pw="$4"
+readonly appName='Cortex XDR'
+readonly oldAppName='Traps'
+readonly appNameVersion="${appName} 8.8"
 readonly cortexApplicationPath='/Applications/Cortex XDR.app'
 readonly cortexLibraryPath='/Library/Application Support/PaloAltoNetworks/Traps/bin'
 readonly cortexUninstallerTool="${cortexLibraryPath}/cortex_xdr_uninstaller_tool"
 readonly trapsUninstallerTool="${cortexLibraryPath}/traps_uninstaller_tool"
 readonly cytoolPath="${cortexLibraryPath}/cytool"
+readonly uninstallWait=5
+readonly installWait=10
 readonly jamfInstall='Cortex_Install-8.8'
 readonly logFile='/var/log/cortex_Upgrade.log'
 
@@ -28,7 +33,7 @@ function check_Uninstall() {
     local name="$2"
     if [[ -f "$path" ]];
     then
-        log_Message "${name} uninstaller found: ${path}"
+        log_Message "Uninstaller found: ${path}"
         if "$path" "$pw" &>/dev/null;
         then
             log_Message "Successfully uninstalled: ${name}"
@@ -37,7 +42,7 @@ function check_Uninstall() {
             return 1
         fi
     else
-        log_Message "Unable to locate: ${name}"
+        log_Message "Unable to locate: \"${name}\""
     fi
     return 0
 }
@@ -46,22 +51,22 @@ function check_Uninstall() {
 function cytool_Checkin() {
     if [[ -f "$cytoolPath" ]];
     then
-        log_Message "cytool found: ${cytoolPath}"
+        log_Message "Successfully located: ${cytoolPath}"
         if "$cytoolPath" checkin &>/dev/null;
         then
             log_Message "cytool check-in successful"
         else
             log_Message "Unable to check-in using cytool"
-            log_Message "Attempting to reconnect"
+            log_Message "Attempting cytool reconnect"
             if "$cytoolPath" reconnect &>/dev/null;
             then
                 log_Message "cytool reconnect successful"
             else
-                log_Message "Unable to reconnect using cytool"
+                log_Message "ERROR: Unable to reconnect using cytool"
             fi
         fi
     else
-        log_Message "ERROR: Unable to locate cytool: ${cytoolPath}"
+        log_Message "ERROR: Unable to locate: \"${cytoolPath}\""
     fi
 }
 
@@ -76,7 +81,10 @@ function app_Check(){
 }
 
 function clean_Env() {
-    pw=''
+    if [[ -n "$pw" ]];
+    then
+        pw=$(head -c ${#pw} /dev/zero | tr '\0' 'X')
+    fi
     unset pw
 }
 
@@ -89,71 +97,70 @@ function main() {
         exit 1
     fi
 
-    printf "Log: $(date "+%F %T") Beginning Cortex 8.8 Upgrade script\n" | tee "$logFile"
+    printf "Log: $(date "+%F %T") Beginning ${appNameVersion} Upgrade script\n" | tee "$logFile"
 
     if [[ ! -d "$cortexApplicationPath" ]];
     then
-        log_Message "Unable to locate Cortex XDR application"
+        log_Message "Unable to locate: ${cortexApplicationPath}"
     else
-        log_Message "Cortex XDR application located: ${cortexApplicationPath}"
+        log_Message "Application present: ${cortexApplicationPath}"
         if [[ ! -f "$cortexUninstallerTool" ]] && [[ ! -f "$trapsUninstallerTool" ]];
         then
-            log_Message "ERROR: Unable to locate Cortex or Traps Uninstaller Tool"
+            log_Message "ERROR: Unable to locate \"${cortexUninstallerTool}\" or \"${trapsUninstallerTool}\""
             exit 1
         fi
 
         if [[ ! -d "$cortexLibraryPath" ]];
         then
-            log_Message "ERROR: Unable to locate Cortex XDR Library folder"
+            log_Message "ERROR: Unable to locate: \"${cortexLibraryPath}\""
             exit 1
         fi
 
-        if ! check_Uninstall "$cortexUninstallerTool" "Cortex XDR";
+        if ! check_Uninstall "$cortexUninstallerTool" "$appName";
         then
-            log_Message "ERROR: Exiting at Cortex XDR uninstall"
+            log_Message "ERROR: Exiting at ${appName} uninstall"
             exit 1
         fi
 
-        if ! check_Uninstall "$trapsUninstallerTool" "Traps";
+        if ! check_Uninstall "$trapsUninstallerTool" "$oldAppName";
         then
-            log_Message "ERROR: Exiting at Traps uninstall"
+            log_Message "ERROR: Exiting at ${oldAppName} uninstall"
             exit 1
         fi
 
-        sleep 5
+        sleep $uninstallWait
 
         if app_Check;
         then
-            log_Message "Cortex XDR application present: ${cortexApplicationPath}"
+            log_Message "Application present: ${cortexApplicationPath}"
             exit 1
         else
-            log_Message "Passed Cortex XDR application check, Cortex XDR removed"
+            log_Message "Successfully removed: ${cortexApplicationPath}"
         fi
     fi
     
-    log_Message "Installing Cortex XDR 8.8"
+    log_Message "Installing ${appNameVersion}"
     if /usr/local/bin/jamf policy -event "$jamfInstall" &>/dev/null;
     then
-        log_Message "Cortex XDR successfully installed"
+        log_Message "Successfully installed: ${appNameVersion}"
     else
-        log_Message "ERROR: Unable to install Cortex XDR"
+        log_Message "ERROR: Unable to install: ${appNameVersion}"
         exit 1
     fi
 
-    sleep 10
+    sleep $installWait
 
-    if ! app_Check;
+    if app_Check;
     then
-        log_Message "Unable to locate Cortex XDR application: ${cortexApplicationPath}"
-        exit 1
+        log_Message "Application present: ${cortexApplicationPath}"
     else
-        log_Message "Passed Cortex XDR application check, Cortex XDR installed"
+        log_Message "Unable to locate: ${cortexApplicationPath}"
+        exit 1
     fi
 
-    log_Message "Attempting Cortex XDR check-in"
+    log_Message "Attempting to check-in with ${appName}"
     cytool_Checkin
-
-    log_Message "Cortex XDR 8.8 upgrade completed successfully"
+    log_Message "${appNameVersion} upgrade finished"
     exit 0
 }
 
