@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 01-30-25  ###
-### Updated: 07-25-25  ###
-### Version: 1.12      ###
+### Updated: 08-21-25  ###
+### Version: 1.13      ###
 ##########################
 
 readonly dateAtStart="$(date "+%F_%H-%M-%S")"
@@ -139,7 +139,6 @@ function display_FoundFiles() {
         filesList="${filesList}\"${file}\","
     done
     filesList="${filesList%,}"
-    
     selectedFile=$(/usr/bin/osascript <<OOP
     tell application "System Events"
         set fileOptions to {${filesList}}
@@ -157,7 +156,12 @@ OOP
     if [[ "$selectedFile" != "done" ]] && [[ -n "$selectedFile" ]];
     then
         log_Message "User selected file: $selectedFile"
-        open "$selectedFile"
+        if [[ -d "/Applications/Microsoft Excel.app" ]];
+        then
+            open -a "/Applications/Microsoft Excel.app" "$selectedFile"
+        else
+            open "$selectedFile"
+        fi
         return 0
     else
         log_Message "User closed file selection dialog"
@@ -264,7 +268,7 @@ function main() {
     sudo_Check
     printf "Log: $(date "+%F %T") Beginning File Search script\n" | tee "$logFile"
 
-    if [ ! -d "$iconPath" ];
+    if [[ ! -d "$iconPath" ]];
     then
         log_Message "Missing icon for AppleScript prompt, exiting"
         exit 1
@@ -393,7 +397,7 @@ function main() {
 }
 
 # Just using trap to catch interrupts
-trap exit_Nicely EXIT
+trap "exit_Nicely" EXIT
 trap 'exit' INT TERM HUP
 
 main
