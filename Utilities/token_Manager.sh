@@ -2,15 +2,15 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 3-12-25   ###
-### Updated: 3-14-25   ###
-### Version: 1.4       ###
+### Created: 03-12-25  ###
+### Updated: 08-25-25  ###
+### Version: 1.5       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='Token Manager'
-readonly logPath='/var/log/token_Manager.log'
+readonly logFile='/var/log/token_Manager.log'
 
 # Check the script is ran with admin privileges
 function sudo_Check() {
@@ -23,7 +23,8 @@ function sudo_Check() {
 
 # Append current status to log file
 function log_Message() {
-    printf "Log: $(date "+%F %T") %s\n" "$1" | tee -a "$logPath"
+    local timestamp="$(date "+%F %T")"
+    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
 }
 
 # Check if account is in the admin group
@@ -53,27 +54,27 @@ function icon_Check() {
     effectiveIconPath="$defaultIconPath"
     if [[ ! -f "$effectiveIconPath" ]];
     then
-        log_Message "No SLU icon found."
+        log_Message "No SLU icon found"
         if [[ -f '/usr/local/bin/jamf' ]];
         then
-            log_Message "Attempting icon install via Jamf."
+            log_Message "Attempting icon install via Jamf"
             /usr/local/bin/jamf policy -event SLUFonts
         else
-            log_Message "No Jamf binary found."
+            log_Message "No Jamf binary found"
         fi
         if [[ ! -f "$effectiveIconPath" ]];
         then
             if [[ -f "$genericIconPath" ]];
             then
-                log_Message "Generic icon found."
+                log_Message "Generic icon found"
                 effectiveIconPath="$genericIconPath"
             else
-                log_Message "Generic icon not found."
+                log_Message "Generic icon not found"
                 return 1
             fi
         fi
     else
-        log_Message "SLU icon found."
+        log_Message "SLU icon found"
     fi
     return 0
 }
@@ -81,30 +82,30 @@ function icon_Check() {
 # AppleScript - Create alert dialog window
 function alert_Dialog() {
     local promptString="$1"
-    log_Message "Displaying alert dialog."
+    log_Message "Displaying alert dialog"
     alertDialog=$(/usr/bin/osascript <<OOP
     try
         set promptString to "$promptString"
         set choice to (display alert promptString as critical buttons "OK" default button 1 giving up after 900)
         if (gave up of choice) is true then
-            return "timeout"
+            return "TIMEOUT"
         else
             return (button returned of choice)
         end if
     on error
-        return "Error"
+        return "ERROR"
     end try
 OOP
     )
     case "$alertDialog" in
-        'Error')
-            log_Message "Unable to show alert dialog."
+        'ERROR')
+            log_Message "Unable to show alert dialog"
             ;;
-        'timeout')
-            log_Message "Alert timed out."
+        'TIMEOUT')
+            log_Message "Alert timed out"
             ;;
         *)
-            log_Message "Continued through alert dialog."
+            log_Message "Continued through alert dialog"
             ;;
     esac
 }
@@ -121,21 +122,21 @@ function dropdown_Prompt() {
         set dropdownOptions to {"Token Status", "Add Token", "Remove Token"}
         set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Token Status" with title dialogTitle)
         if userChoice is false then
-            return "quit"
+            return "QUIT"
         else if userChoice is {} then
-            return "timeout"
+            return "TIMEOUT"
         else
             return (item 1 of userChoice)
         end if
 OOP
         )
         case "$dropdownPrompt" in
-            'quit')
-                log_Message "User selected quit."
+            'QUIT')
+                log_Message "User chose: quit"
                 return 1
                 ;;
-            'timeout')
-                log_Message "Timed out, re-prompting ($count/10)."
+            'TIMEOUT')
+                log_Message "Timed out, re-prompting ($count/10)"
                 ((count++))
                 ;;
             *)
@@ -160,22 +161,22 @@ function binary_Dialog() {
             set dialogResult to display dialog promptString buttons {"Go Back", "Done"} default button "Done" with icon POSIX file iconPath with title dialogTitle giving up after 900
             set buttonChoice to button returned of dialogResult
             if buttonChoice is equal to "" then
-                return "timeout"
+                return "TIMEOUT"
             else
                 return buttonChoice
             end if
         on error
-            return "Cancel"
+            return "CANCEL"
         end try
 OOP
         )
         case "$binDialog" in
-            'Cancel' | 'Go Back')
+            'CANCEL' | 'Go Back')
                 log_Message "User responded with: $binDialog"
                 return 1
                 ;;
-            'timeout')
-                log_Message "No response, re-prompting ($count/10)."
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)"
                 ((count++))
                 ;;
             *)
@@ -209,30 +210,30 @@ function textField_Dialog() {
             if buttonChoice is equal to "OK" then
                 return text returned of dialogResult
             else
-                return "timeout"
+                return "TIMEOUT"
             end if
         on error
-            return "Cancel"
+            return "CANCEL"
         end try
 OOP
         )
         case "$textFieldDialog" in
-            'Cancel')
+            'CANCEL')
                 log_Message "User responded with: $textFieldDialog"
                 return 1
                 ;;
-            'timeout')
-                log_Message "No response, re-prompting ($count/10)."
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)"
                 ((count++))
                 ;;
             '')
-                log_Message "Nothing entered in text field."
-                alert_Dialog "Please enter something."
+                log_Message "Nothing entered in text field"
+                alert_Dialog "Please enter something"
                 ;;
             *)
                 if [[ "$dialogType" == 'hidden' ]];
                 then
-                    log_Message "Password entered."
+                    log_Message "Password entered"
                 else
                     log_Message "User responded with: $textFieldDialog"
                 fi
@@ -249,7 +250,7 @@ function get_UserArrays() {
     nonSecureTokenUserArray=()
     adminAccountArray=()
     secureTokenAdminArray=()
-    log_Message "Getting secure token UIDs."
+    log_Message "Getting secure token UIDs"
     local secureTokenUIDs=($(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}'))
     for username in $(/usr/bin/dscl . -list /Users | grep -v "^_");
     do
@@ -361,13 +362,14 @@ function token_Action() {
     then
         local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
     else
-        log_Message "Error with token action."
+        log_Message "Error with token action"
         return 1
     fi
     if [[ "$result" == *"Done"* ]];
     then
         return 0
     else
+        log_Message "sysadminctl result: ${result}"
         return 1
     fi
 }
@@ -379,38 +381,38 @@ function token_Action_Display() {
     local tokenActionType="$3"
     if ! textField_Dialog "$firstPrompt"
     then
-        log_Message "Exiting at first $tokenActionType text field dialog."
+        log_Message "Exiting at first $tokenActionType text field dialog"
     else
-        log_Message "Continued through $tokenActionType text field dialog."
+        log_Message "Continued through $tokenActionType text field dialog"
         adminAccount="$textFieldDialog"
         if ! account_Check "$adminAccount";
         then
-            log_Message "$adminAccount does not exist."
+            log_Message "$adminAccount does not exist"
             alert_Dialog "$adminAccount does not exist!"
             return 1
         fi
         if ! textField_Dialog "$secondPrompt";
         then
-            log_Message "Exiting at second $tokenActionType text field dialog."
+            log_Message "Exiting at second $tokenActionType text field dialog"
         else
-            log_Message "Continued through second $tokenActionType text field dialog."
+            log_Message "Continued through second $tokenActionType text field dialog"
             tokenAccount="$textFieldDialog"
             if ! account_Check "$tokenAccount";
             then
-                log_Message "$tokenAccount does not exist."
+                log_Message "$tokenAccount does not exist"
                 alert_Dialog "$tokenAccount does not exist!"
                 return 1
             fi
-            log_Message "Prompting for $adminAccount password."
+            log_Message "Prompting for $adminAccount password"
             if ! textField_Dialog "Enter the password for $adminAccount:" "hidden";
             then
-                log_Message "Exiting at first password prompt."
+                log_Message "Exiting at first password prompt"
             else
                 adminPassword="$textFieldDialog"
-                log_Message "Prompting for $tokenAccount password."
+                log_Message "Prompting for $tokenAccount password"
                 if ! textField_Dialog "Enter the password for $tokenAccount:" "hidden";
                 then
-                    log_Message "Exiting at second password prompt."
+                    log_Message "Exiting at second password prompt"
                 else
                     tokenPassword="$textFieldDialog"
                     if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
@@ -423,12 +425,12 @@ function token_Action_Display() {
                         adminPassword=''
                         tokenPassword=''
                         log_Message "$tokenActionType completed!"
-                        log_Message "Displaying Token Status dialog."
+                        log_Message "Displaying Token Status dialog"
                         get_UserArrays
                         secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
                         if binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
                         then
-                            log_Message "Exiting at Token Status dialog."
+                            log_Message "Exiting at Token Status dialog"
                             return 0
                         fi
                     fi
@@ -443,53 +445,53 @@ function token_Action_Display() {
 
 function main() {
     sudo_Check
-    printf "Log: $(date "+%F %T") Beginning Token Manager script.\n" | tee "$logPath"
+    printf "Log: $(date "+%F %T") Beginning Token Manager script\n" | tee "$logFile"
 
     if ! icon_Check;
     then
         alert_Dialog "Missing required icon files!"
-        log_Message "Exiting for no icon."
+        log_Message "Exiting for no icon"
         exit 1
     fi
 
     returnToDropdown=1
     while [ $returnToDropdown -eq 1 ];
     do
-        log_Message "Displaying dropdown dialog."
+        log_Message "Displaying dropdown dialog"
         if ! dropdown_Prompt "Select the desired Secure Token action:";
         then
-            log_Message "Exiting at dropdown dialog."
+            log_Message "Exiting at dropdown dialog"
             returnToDropdown=0
         else
             get_UserArrays
             case "$dropdownPrompt" in
                 'Token Status')
                     secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
-                    log_Message "Displaying Token Status dialog."
+                    log_Message "Displaying Token Status dialog"
                     if ! binary_Dialog "$secureTokenCombinedPhrase";
                     then
-                        log_Message "Going back to dropdown dialog."
+                        log_Message "Going back to dropdown dialog"
                     else
-                        log_Message "Exiting at Token Status dialog."
+                        log_Message "Exiting at Token Status dialog"
                         returnToDropdown=0
                     fi
                     ;;
 
                 'Add Token')
-                    log_Message "Displaying first Add Token text field dialog."
+                    log_Message "Displaying first Add Token text field dialog"
                     if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenAdminPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
                     then
-                        log_Message "Going back to dropdown dialog."
+                        log_Message "Going back to dropdown dialog"
                     else
                         returnToDropdown=0
                     fi
                     ;;
 
                 'Remove Token')
-                    log_Message "Displaying first Remove Token text field dialog."
+                    log_Message "Displaying first Remove Token text field dialog"
                     if ! token_Action_Display "Enter the username of an Admin account:\n\n${adminAccountPhrase}" "Enter the username of an account to remove the Secure Token from:\n\n${secureTokenPhrase}" "$dropdownPrompt";
                     then
-                        log_Message "Going back to dropdown dialog."
+                        log_Message "Going back to dropdown dialog"
                     else
                         returnToDropdown=0
                     fi
@@ -497,7 +499,7 @@ function main() {
 
                 *)
                     alert_Dialog "Unknown option chosen from dropdown menu!"
-                    log_Message "Error, exiting after option chosen from dropdown dialog."
+                    log_Message "Error, exiting after option chosen from dropdown dialog"
                     exit 1
                     ;;
             esac
