@@ -4,11 +4,12 @@
 ### Author: Zac Reeves ###
 ### Created: 03-12-25  ###
 ### Updated: 08-25-25  ###
-### Version: 1.5       ###
+### Version: 1.6       ###
 ##########################
 
-readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
-readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
+readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
+readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
+activeIcon="$SLUIconFile"
 readonly dialogTitle='Token Manager'
 readonly logFile='/var/log/token_Manager.log'
 
@@ -16,6 +17,7 @@ readonly logFile='/var/log/token_Manager.log'
 function sudo_Check() {
     if [ "$(id -u)" -ne 0 ];
     then
+        printf "Please run this script as root or using sudo!\n"
         alert_Dialog "Please run this script as root or using sudo!"
         exit 1
     fi
@@ -23,36 +25,37 @@ function sudo_Check() {
 
 # Append current status to log file
 function log_Message() {
+    local message="$1"
+    local type="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
+    printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Check if account is in the admin group
 function admin_Check(){
     local account="$1"
-    if /usr/sbin/dseditgroup -o checkmember -m "$account" admin >/dev/null;
-    then
-        return 0
-    else
-        return 1
-    fi
+    /usr/sbin/dseditgroup -o checkmember -m "$account" admin &>/dev/null
+    return $?
 }
 
 # Check if account exists
 function account_Check() {
     local account="$1"
-    if /usr/bin/id "$account" >/dev/null;
-    then
-        return 0
-    else
-        return 1
-    fi
+    /usr/bin/id "$account" &>/dev/null
+    return $?
+}
+
+# Verify account password
+function verify_Pass() {
+    local account="$1"
+    local pass="$2"
+    /usr/bin/dscl . -authonly "$account" "$pass" &>/dev/null
+    return $?
 }
 
 # Check for valid icon file, AppleScript dialog boxes will error without it
 function icon_Check() {
-    effectiveIconPath="$defaultIconPath"
-    if [[ ! -f "$effectiveIconPath" ]];
+    if [[ ! -f "$activeIcon" ]];
     then
         log_Message "No SLU icon found"
         if [[ -f '/usr/local/bin/jamf' ]];
@@ -62,14 +65,14 @@ function icon_Check() {
         else
             log_Message "No Jamf binary found"
         fi
-        if [[ ! -f "$effectiveIconPath" ]];
+        if [[ ! -f "$activeIcon" ]];
         then
-            if [[ -f "$genericIconPath" ]];
+            if [[ -f "$genericIconFile" ]];
             then
                 log_Message "Generic icon found"
-                effectiveIconPath="$genericIconPath"
+                activeIcon="$genericIconFile"
             else
-                log_Message "Generic icon not found"
+                log_Message "Generic icon not found" "ERROR"
                 return 1
             fi
         fi
@@ -117,22 +120,25 @@ function dropdown_Prompt() {
     while [ $count -le 10 ];
     do
         dropdownPrompt=$(/usr/bin/osascript <<OOP
-        set promptString to "$promptString"
-        set dialogTitle to "$dialogTitle"
-        set dropdownOptions to {"Token Status", "Add Token", "Remove Token"}
-        set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Token Status" with title dialogTitle)
-        if userChoice is false then
-            return "QUIT"
-        else if userChoice is {} then
-            return "TIMEOUT"
-        else
-            return (item 1 of userChoice)
-        end if
+        tell application "Finder"
+            activate
+            set promptString to "$promptString"
+            set dialogTitle to "$dialogTitle"
+            set dropdownOptions to {"Current Token Status", "Add Token", "Remove Token"}
+            set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Current Token Status" with title dialogTitle)
+            if userChoice is false then
+                return "QUIT"
+            else if userChoice is {} then
+                return "TIMEOUT"
+            else
+                return (item 1 of userChoice)
+            end if
+        end tell
 OOP
         )
         case "$dropdownPrompt" in
             'QUIT')
-                log_Message "User chose: quit"
+                log_Message "User chose: \"Quit\""
                 return 1
                 ;;
             'TIMEOUT')
@@ -140,11 +146,12 @@ OOP
                 ((count++))
                 ;;
             *)
-                log_Message "User chose: $dropdownPrompt"
+                log_Message "User chose: \"${dropdownPrompt}\""
                 return 0
                 ;;
         esac
     done
+    return 1
 }
 
 # AppleScript - Informing the user and giving them two choices
@@ -156,7 +163,7 @@ function binary_Dialog() {
         binDialog=$(/usr/bin/osascript <<OOP
         try
             set promptString to "$promptString"
-            set iconPath to "$effectiveIconPath"
+            set iconPath to "$activeIcon"
             set dialogTitle to "$dialogTitle"
             set dialogResult to display dialog promptString buttons {"Go Back", "Done"} default button "Done" with icon POSIX file iconPath with title dialogTitle giving up after 900
             set buttonChoice to button returned of dialogResult
@@ -198,7 +205,7 @@ function textField_Dialog() {
         textFieldDialog=$(/usr/bin/osascript <<OOP
         try
             set promptString to "$promptString"
-            set iconPath to "$effectiveIconPath"
+            set iconPath to "$activeIcon"
             set dialogTitle to "$dialogTitle"
             set dialogType to "$dialogType"
             if dialogType is "hidden" then
@@ -219,7 +226,7 @@ OOP
         )
         case "$textFieldDialog" in
             'CANCEL')
-                log_Message "User responded with: $textFieldDialog"
+                log_Message "User responded with: \"${textFieldDialog}\""
                 return 1
                 ;;
             'TIMEOUT')
@@ -227,7 +234,7 @@ OOP
                 ((count++))
                 ;;
             '')
-                log_Message "Nothing entered in text field"
+                log_Message "Nothing entered in text field" "ERROR"
                 alert_Dialog "Please enter something"
                 ;;
             *)
@@ -362,14 +369,14 @@ function token_Action() {
     then
         local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
     else
-        log_Message "Error with token action"
+        log_Message "Invalid token action" "ERROR"
         return 1
     fi
     if [[ "$result" == *"Done"* ]];
     then
         return 0
     else
-        log_Message "sysadminctl result: ${result}"
+        log_Message "sysadminctl result: ${result}" "ERROR"
         return 1
     fi
 }
@@ -381,14 +388,20 @@ function token_Action_Display() {
     local tokenActionType="$3"
     if ! textField_Dialog "$firstPrompt"
     then
-        log_Message "Exiting at first $tokenActionType text field dialog"
+        log_Message "Exiting at first \"${tokenActionType}\" text field dialog"
     else
-        log_Message "Continued through $tokenActionType text field dialog"
+        log_Message "Continued through \"${tokenActionType}\" text field dialog"
         adminAccount="$textFieldDialog"
         if ! account_Check "$adminAccount";
         then
-            log_Message "$adminAccount does not exist"
+            log_Message "$adminAccount does not exist" "ERROR"
             alert_Dialog "$adminAccount does not exist!"
+            return 1
+        fi
+        if ! admin_Check "$adminAccount";
+        then
+            log_Message "$adminAccount is not an admin" "ERROR"
+            alert_Dialog "$adminAccount is not an admin!"
             return 1
         fi
         if ! textField_Dialog "$secondPrompt";
@@ -399,7 +412,7 @@ function token_Action_Display() {
             tokenAccount="$textFieldDialog"
             if ! account_Check "$tokenAccount";
             then
-                log_Message "$tokenAccount does not exist"
+                log_Message "$tokenAccount does not exist" "ERROR"
                 alert_Dialog "$tokenAccount does not exist!"
                 return 1
             fi
@@ -409,21 +422,31 @@ function token_Action_Display() {
                 log_Message "Exiting at first password prompt"
             else
                 adminPassword="$textFieldDialog"
+                if ! verify_Pass "$adminAccount" "$adminPassword";
+                then
+                    log_Message "Incorrect password"
+                    alert_Dialog "Incorrect password!\n\nPlease try again"
+                    return 1
+                fi
                 log_Message "Prompting for $tokenAccount password"
                 if ! textField_Dialog "Enter the password for $tokenAccount:" "hidden";
                 then
                     log_Message "Exiting at second password prompt"
                 else
                     tokenPassword="$textFieldDialog"
+                    if ! verify_Pass "$tokenAccount" "$tokenPassword";
+                    then
+                        log_Message "Incorrect password"
+                        alert_Dialog "Incorrect password!\n\nPlease try again"
+                        return 1
+                    fi
                     if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
                     then
-                        adminPassword=''
-                        tokenPassword=''
-                        log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")"
+                        clean_Env
+                        log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")" "ERROR"
                         alert_Dialog "Error with Secure token action!\n\nPriviliged Account:\n${adminAccount}\n\nNon-Priviliged Account:\n${tokenAccount}\n\nToken Action:\n${tokenActionType}"
                     else
-                        adminPassword=''
-                        tokenPassword=''
+                        clean_Env
                         log_Message "$tokenActionType completed!"
                         log_Message "Displaying Token Status dialog"
                         get_UserArrays
@@ -438,13 +461,26 @@ function token_Action_Display() {
             fi
         fi
     fi
-    adminPassword=''
-    tokenPassword=''
+    clean_Env
     return 1
+}
+
+function clean_Env() {
+    if [[ -n "$adminPassword" ]];
+    then
+        adminPassword=$(head -c ${#adminPassword} /dev/zero | tr '\0' 'X')
+    fi
+    unset adminPassword 
+    if [[ -n "$tokenPassword" ]];
+    then
+        tokenPassword=$(head -c ${#tokenPassword} /dev/zero | tr '\0' 'X')
+    fi
+    unset tokenPassword 
 }
 
 function main() {
     sudo_Check
+    trap "clean_Env" EXIT INT TERM HUP
     printf "Log: $(date "+%F %T") Beginning Token Manager script\n" | tee "$logFile"
 
     if ! icon_Check;
@@ -465,7 +501,7 @@ function main() {
         else
             get_UserArrays
             case "$dropdownPrompt" in
-                'Token Status')
+                'Current Token Status')
                     secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
                     log_Message "Displaying Token Status dialog"
                     if ! binary_Dialog "$secureTokenCombinedPhrase";
@@ -499,7 +535,7 @@ function main() {
 
                 *)
                     alert_Dialog "Unknown option chosen from dropdown menu!"
-                    log_Message "Error, exiting after option chosen from dropdown dialog"
+                    log_Message "Exiting after option chosen from dropdown dialog" "ERROR"
                     exit 1
                     ;;
             esac
@@ -511,3 +547,4 @@ function main() {
 }
 
 main
+
