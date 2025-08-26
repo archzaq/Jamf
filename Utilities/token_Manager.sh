@@ -12,6 +12,7 @@ readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents
 activeIcon="$SLUIconFile"
 readonly dialogTitle='Token Manager'
 readonly logFile='/var/log/token_Manager.log'
+readonly helperPath=''
 
 # Check the script is ran with admin privileges
 function sudo_Check() {
@@ -356,7 +357,7 @@ function get_UserArrays() {
 }
 
 # Function for adding and removing Secure Tokens
-function token_Action() {
+function token_Action_Old() {
     local tokenAccount="$1"
     local tokenPassword="$2"
     local adminAccount="$3"
@@ -381,6 +382,43 @@ function token_Action() {
     fi
 }
 
+function token_Action() {
+    local tokenAccount="$1"
+    local tokenPassword="$2"
+    local adminAccount="$3"
+    local adminPassword="$4"
+    local tokenAction="$5"
+    local operation
+    local result
+    if [[ "$tokenAction" == 'Add Token' ]];
+    then
+        operation='add'
+    elif [[ "$tokenAction" == 'Remove Token' ]];
+    then
+        operation='remove'
+    else
+        log_Message "Invalid token action" "ERROR"
+        return 1
+    fi
+
+    if [[ -f "$helperPath" ]];
+    then
+        result=$(printf "%s\n%s" "$tokenPassword" "$adminPassword" | \
+            "$helperPath" "$operation" "$tokenAccount" "$adminAccount" 2>&1)
+    else
+        log_Message "No security tool found" "ERROR"
+        return 1
+    fi
+
+    if [[ "$result" == "SUCCESS" ]];
+    then
+        return 0
+    else
+        log_Message "sysadminctl result: ${result}" "ERROR"
+        return 1
+    fi
+}
+
 # Main logic of Secure Token action being taken
 function token_Action_Display() {
     local firstPrompt="$1"
@@ -389,80 +427,89 @@ function token_Action_Display() {
     if ! textField_Dialog "$firstPrompt"
     then
         log_Message "Exiting at first \"${tokenActionType}\" text field dialog"
+        return 1
+    fi
+    log_Message "Continued through \"${tokenActionType}\" text field dialog"
+    adminAccount="$textFieldDialog"
+
+    if ! account_Check "$adminAccount";
+    then
+        log_Message "$adminAccount does not exist" "ERROR"
+        alert_Dialog "$adminAccount does not exist!"
+        return 1
+    fi
+
+    if ! admin_Check "$adminAccount";
+    then
+        log_Message "$adminAccount is not an admin" "ERROR"
+        alert_Dialog "$adminAccount is not an admin!"
+        return 1
+    fi
+
+    if ! textField_Dialog "$secondPrompt";
+    then
+        log_Message "Exiting at second $tokenActionType text field dialog"
+        return 1
+    fi
+    log_Message "Continued through second $tokenActionType text field dialog"
+
+    tokenAccount="$textFieldDialog"
+    if ! account_Check "$tokenAccount";
+    then
+        log_Message "$tokenAccount does not exist" "ERROR"
+        alert_Dialog "$tokenAccount does not exist!"
+        return 1
+    fi
+
+    log_Message "Prompting for $adminAccount password"
+    if ! textField_Dialog "Enter the password for $adminAccount:" "hidden";
+    then
+        log_Message "Exiting at first password prompt"
+        return 1
+    fi
+    adminPassword="$textFieldDialog"
+
+    if ! verify_Pass "$adminAccount" "$adminPassword";
+    then
+        log_Message "Incorrect password"
+        alert_Dialog "Incorrect password!\n\nPlease try again"
+        return 1
+    fi
+
+    log_Message "Prompting for $tokenAccount password"
+    if ! textField_Dialog "Enter the password for $tokenAccount:" "hidden";
+    then
+        log_Message "Exiting at second password prompt"
+        return 1
+    fi
+    tokenPassword="$textFieldDialog"
+
+    if ! verify_Pass "$tokenAccount" "$tokenPassword";
+    then
+        log_Message "Incorrect password"
+        alert_Dialog "Incorrect password!\n\nPlease try again"
+        return 1
+    fi
+
+    if ! token_Action_Old "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
+    then
+        clean_Env
+        log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")" "ERROR"
+        alert_Dialog "Error with Secure token action!\n\nPriviliged Account:\n${adminAccount}\n\nNon-Priviliged Account:\n${tokenAccount}\n\nToken Action:\n${tokenActionType}"
     else
-        log_Message "Continued through \"${tokenActionType}\" text field dialog"
-        adminAccount="$textFieldDialog"
-        if ! account_Check "$adminAccount";
+        clean_Env
+        log_Message "$tokenActionType completed!"
+        log_Message "Displaying Token Status dialog"
+        get_UserArrays
+        secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
+        if binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
         then
-            log_Message "$adminAccount does not exist" "ERROR"
-            alert_Dialog "$adminAccount does not exist!"
-            return 1
-        fi
-        if ! admin_Check "$adminAccount";
-        then
-            log_Message "$adminAccount is not an admin" "ERROR"
-            alert_Dialog "$adminAccount is not an admin!"
-            return 1
-        fi
-        if ! textField_Dialog "$secondPrompt";
-        then
-            log_Message "Exiting at second $tokenActionType text field dialog"
-        else
-            log_Message "Continued through second $tokenActionType text field dialog"
-            tokenAccount="$textFieldDialog"
-            if ! account_Check "$tokenAccount";
-            then
-                log_Message "$tokenAccount does not exist" "ERROR"
-                alert_Dialog "$tokenAccount does not exist!"
-                return 1
-            fi
-            log_Message "Prompting for $adminAccount password"
-            if ! textField_Dialog "Enter the password for $adminAccount:" "hidden";
-            then
-                log_Message "Exiting at first password prompt"
-            else
-                adminPassword="$textFieldDialog"
-                if ! verify_Pass "$adminAccount" "$adminPassword";
-                then
-                    log_Message "Incorrect password"
-                    alert_Dialog "Incorrect password!\n\nPlease try again"
-                    return 1
-                fi
-                log_Message "Prompting for $tokenAccount password"
-                if ! textField_Dialog "Enter the password for $tokenAccount:" "hidden";
-                then
-                    log_Message "Exiting at second password prompt"
-                else
-                    tokenPassword="$textFieldDialog"
-                    if ! verify_Pass "$tokenAccount" "$tokenPassword";
-                    then
-                        log_Message "Incorrect password"
-                        alert_Dialog "Incorrect password!\n\nPlease try again"
-                        return 1
-                    fi
-                    if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
-                    then
-                        clean_Env
-                        log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")" "ERROR"
-                        alert_Dialog "Error with Secure token action!\n\nPriviliged Account:\n${adminAccount}\n\nNon-Priviliged Account:\n${tokenAccount}\n\nToken Action:\n${tokenActionType}"
-                    else
-                        clean_Env
-                        log_Message "$tokenActionType completed!"
-                        log_Message "Displaying Token Status dialog"
-                        get_UserArrays
-                        secureTokenCombinedPhrase="${secureTokenPhrase}\n\n${nonSecureTokenPhrase}"
-                        if binary_Dialog "Process completed successfully!\n\n${secureTokenCombinedPhrase}";
-                        then
-                            log_Message "Exiting at Token Status dialog"
-                            return 0
-                        fi
-                    fi
-                fi
-            fi
+            log_Message "Exiting at Token Status dialog"
+            return 0
         fi
     fi
     clean_Env
-    return 1
+    return 0
 }
 
 function clean_Env() {
