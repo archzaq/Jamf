@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 03-12-25  ###
-### Updated: 08-25-25  ###
-### Version: 1.6       ###
+### Updated: 08-28-25  ###
+### Version: 1.7       ###
 ##########################
 
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
@@ -13,6 +13,7 @@ activeIcon="$SLUIconFile"
 readonly dialogTitle='Token Manager'
 readonly logFile='/var/log/token_Manager.log'
 readonly helperPath=''
+monitorPID=''
 
 # Check the script is ran with admin privileges
 function sudo_Check() {
@@ -52,6 +53,38 @@ function verify_Pass() {
     local pass="$2"
     /usr/bin/dscl . -authonly "$account" "$pass" &>/dev/null
     return $?
+}
+
+# Add account to admin group
+function addAccount_AdminGroup() {
+    local account="$1"
+    local adminAccount="$2"
+    local adminPass="$3"
+    /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPass" -t user -L admin &>/dev/null
+    if admin_Check "$account";
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Remove account from admin group
+function removeAccount_AdminGroup() {
+    local account="$1"
+    local admin="$2"
+    local adminPass="$3"
+    if [ "$existingAdmin" != true ];
+    then
+        /usr/sbin/dseditgroup -o edit -d "$account" -u "$admin" -P "$adminPass" -t user -L admin &>/dev/null
+        if admin_Check "$account";
+        then
+            return 1
+        fi
+    else
+        log_Message "Leaving $account permissions"
+    fi
+    return 0
 }
 
 # Check for valid icon file, AppleScript dialog boxes will error without it
@@ -121,20 +154,17 @@ function dropdown_Prompt() {
     while [ $count -le 10 ];
     do
         dropdownPrompt=$(/usr/bin/osascript <<OOP
-        tell application "Finder"
-            activate
-            set promptString to "$promptString"
-            set dialogTitle to "$dialogTitle"
-            set dropdownOptions to {"Current Token Status", "Add Token", "Remove Token"}
-            set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Current Token Status" with title dialogTitle)
-            if userChoice is false then
-                return "QUIT"
-            else if userChoice is {} then
-                return "TIMEOUT"
-            else
-                return (item 1 of userChoice)
-            end if
-        end tell
+        set promptString to "$promptString"
+        set dialogTitle to "$dialogTitle"
+        set dropdownOptions to {"Current Token Status", "Add Token", "Remove Token"}
+        set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Current Token Status" with title dialogTitle)
+        if userChoice is false then
+            return "QUIT"
+        else if userChoice is {} then
+            return "TIMEOUT"
+        else
+            return (item 1 of userChoice)
+        end if
 OOP
         )
         case "$dropdownPrompt" in
@@ -363,12 +393,13 @@ function token_Action_Old() {
     local adminAccount="$3"
     local adminPassword="$4"
     local tokenAction="$5"
+    local result
     if [[ "$tokenAction" == 'Add Token' ]];
     then
-        local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOn \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
+        result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOn \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
     elif [[ "$tokenAction" == 'Remove Token' ]];
     then
-        local result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
+        result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
     else
         log_Message "Invalid token action" "ERROR"
         return 1
@@ -424,6 +455,7 @@ function token_Action_Display() {
     local firstPrompt="$1"
     local secondPrompt="$2"
     local tokenActionType="$3"
+    existingAdmin=0
     if ! textField_Dialog "$firstPrompt"
     then
         log_Message "Exiting at first \"${tokenActionType}\" text field dialog"
@@ -442,8 +474,9 @@ function token_Action_Display() {
     if ! admin_Check "$adminAccount";
     then
         log_Message "$adminAccount is not an admin" "ERROR"
-        alert_Dialog "$adminAccount is not an admin!"
-        return 1
+        existingAdmin=0
+    else
+        existingAdmin=1
     fi
 
     if ! textField_Dialog "$secondPrompt";
@@ -489,6 +522,17 @@ function token_Action_Display() {
         log_Message "Incorrect password"
         alert_Dialog "Incorrect password!\n\nPlease try again"
         return 1
+    fi
+
+    if [ $existingAdmin -eq 0 ];
+    then
+        monitor_Commands "$adminAccount" "25" &
+        monitorPID=$!
+        if ! addAccount_AdminGroup "$adminAccount" "$tAccountName" "$tAccountPass";
+        then
+            log_Message "Unable to grant permissions to $adminUser" "ERROR"
+            return 1
+        fi
     fi
 
     if ! token_Action_Old "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
@@ -562,7 +606,7 @@ function main() {
 
                 'Add Token')
                     log_Message "Displaying first Add Token text field dialog"
-                    if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenAdminPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
+                    if ! token_Action_Display "Enter the username of a Secure Token account:\n\n${secureTokenPhrase}" "Enter the username of a Non-Secure Token account:\n\n${nonSecureTokenPhrase}" "$dropdownPrompt";
                     then
                         log_Message "Going back to dropdown dialog"
                     else
