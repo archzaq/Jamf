@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
-### Updated: 07-10-25  ###
-### Version: 1.12      ###
+### Updated: 08-30-25  ###
+### Version: 1.13      ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -117,6 +117,7 @@ function create_Account() {
             done
             chown -R "$accountAdd":staff "$accountAddPath"
             chown +a "group:everyone deny delete" "$accountAddPath"
+            chmod 750 "$accountAddPath"
             log_Message "$accountAdd successfully configured"
             return 0
         else
