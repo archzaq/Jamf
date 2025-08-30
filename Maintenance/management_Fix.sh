@@ -115,6 +115,8 @@ function create_Account() {
                 chown "$accountAdd":staff "$accountAddPath/$dir"
                 chmod 750 "$accountAddPath/$dir"
             done
+            chown -R "$accountAdd":staff "$accountAddPath"
+            chown +a "group:everyone deny delete" "$accountAddPath"
             log_Message "$accountAdd successfully configured"
             return 0
         else
