@@ -342,7 +342,7 @@ function main() {
     log_Message "Checking for: \"$elevatedAccount\""
     if account_Check "$elevatedAccount";
     then
-        log_Message "ERROR: Elevated account already exists, exiting"
+        log_Message "ERROR: Elevated account already exists"
         if ! binary_Dialog "Elevated account already exists!\n\nWould you like to delete this account and create a new one?";
         then
             log_Message "Exiting at binary dialog"
