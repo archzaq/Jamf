@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
-### Updated: 08-12-25  ###
-### Version: 2.0       ###
+### Updated: 08-30-25  ###
+### Version: 2.1       ###
 ##########################
 
 managementAccount="$4"
@@ -116,6 +116,7 @@ function create_AdminAccount() {
                 chmod 750 "$accountAddPath/$dir"
             done
             chown -R "$accountAdd":staff "$accountAddPath"
+            chown +a "group:everyone deny delete" "$accountAddPath"
             chmod 750 "$accountAddPath"
             log_Message "Successfully configured: \"${accountAdd}\""
             return 0
