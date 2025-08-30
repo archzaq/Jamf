@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
 ### Updated: 08-30-25  ###
-### Version: 2.2       ###
+### Version: 2.3       ###
 ##########################
 
 managementAccount="$4"
@@ -20,15 +20,17 @@ readonly maxAttempts=10
 
 # Append current status to log file
 function log_Message() {
+    local message="$1"
+    local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Ensure external arguments are passed
 function arg_Check() {
     if [[ -z "$managementAccount" ]] || [[ -z "$managementAccountPass" ]] || [[ -z "$elevatedAccount" ]]; 
     then
-        log_Message "ERROR: Missing critical arguments"
+        log_Message "Missing critical arguments" "ERROR"
         return 1
     fi
     return 0
@@ -54,7 +56,7 @@ function icon_Check() {
                 log_Message "Generic icon found"
                 activeIcon="$genericIconFile"
             else
-                log_Message "ERROR: Generic icon not found"
+                log_Message "Generic icon not found" "ERROR"
                 return 1
             fi
         fi
@@ -68,7 +70,7 @@ function icon_Check() {
 function login_Check() {
     if [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == 'root' ]];
     then
-        log_Message "No one currently logged in"
+        log_Message "No one currently logged in" "ERROR"
         return 1
     else
         log_Message "Currently logged in: \"${currentUser}\""
@@ -122,10 +124,10 @@ function create_AdminAccount() {
             log_Message "Successfully configured: \"${accountAdd}\""
             return 0
         else
-            log_Message "ERROR: Failed to configure: \"${accountAdd}\""
+            log_Message "Failed to configure: \"${accountAdd}\"" "ERROR"
         fi
     else
-        log_Message "ERROR: Failed to create: \"${accountAdd}\""
+        log_Message "Failed to create: \"${accountAdd}\"" "ERROR"
     fi
     return 1
 }
@@ -142,7 +144,7 @@ function assign_Token(){
     then
         return 0
     else
-        log_Message "ERROR: Assign token failed, sysadminctl output: $output"
+        log_Message "Assign token failed, sysadminctl output: $output" "ERROR"
         return 1
     fi
 }
@@ -193,7 +195,7 @@ OOP
                 return 1
                 ;;
             'TIMEOUT')
-                log_Message "No response, re-prompting ($count/10)"
+                log_Message "No response, re-prompting ($count/10)" "WARNING"
                 ((count++))
                 ;;
             *)
@@ -240,7 +242,7 @@ OOP
                 return 1
                 ;;
             'timeout')
-                log_Message "No response, re-prompting ($count/10)"
+                log_Message "No response, re-prompting ($count/10)" "WARNING"
                 ((count++))
                 ;;
             '')
@@ -286,7 +288,7 @@ OOP
             log_Message "Unable to show alert dialog"
             ;;
         'TIMEOUT')
-            log_Message "Alert timed out"
+            log_Message "Alert timed out" "WARNING"
             ;;
         *)
             log_Message "Continued through alert dialog"
@@ -334,7 +336,7 @@ function main() {
     log_Message "Checking for: \"$managementAccount\""
     if ! account_Check "$managementAccount";
     then
-        log_Message "ERROR: Management account does not exist, exiting"
+        log_Message "Management account does not exist, exiting" "ERROR"
         alert_Dialog "Missing Account" "${managementAccount} account does not exist!"
         exit 1
     fi
@@ -342,7 +344,7 @@ function main() {
     log_Message "Checking for: \"$elevatedAccount\""
     if account_Check "$elevatedAccount";
     then
-        log_Message "ERROR: Elevated account already exists"
+        log_Message "Elevated account already exists" "ERROR"
         if ! binary_Dialog "Elevated account already exists!\n\nWould you like to delete this account and create a new one?";
         then
             log_Message "Exiting at binary dialog"
@@ -353,7 +355,7 @@ function main() {
             then
                 log_Message "Elevated account deleted"
             else
-                log_Message "ERROR: Unable to delete elevate account"
+                log_Message "Unable to delete elevate account" "ERROR"
                 exit 1
             fi
         fi
@@ -362,7 +364,7 @@ function main() {
     log_Message "Checking permissions for: \"$managementAccount\""
     if ! admin_Check "$managementAccount";
     then
-        log_Message "ERROR: Management account is not an admin, exiting"
+        log_Message "Management account is not an admin, exiting" "ERROR"
         alert_Dialog "Insufficient Permissions" "${managementAccount} account is not an admin!"
         exit 1
     fi
@@ -400,7 +402,7 @@ function main() {
                     unset elevatedAccountPassVerify
                     validPass=true
                 else
-                    log_Message "ERROR: INFO do not match"
+                    log_Message "INFO do not match" "ERROR"
                     alert_Dialog "Password Error" "Passwords do not match!"
                 fi
             fi
@@ -424,12 +426,12 @@ function main() {
             log_Message "Secure Token present for: \"${managementAccount}\""
             if ! assign_Token "$managementAccount" "$managementAccountPass" "$elevatedAccount" "$elevatedAccountPass";
             then
-                log_Message "ERROR: Unable to assign Secure Token to: \"${elevatedAccount}\""
+                log_Message "Unable to assign Secure Token to: \"${elevatedAccount}\"" "ERROR"
             else
                 log_Message "Secure Token successfully assigned to: \"${elevatedAccount}\""
             fi
         else
-            log_Message "ERROR: \"${managementAccount}\" does not have a Secure Token to assign to \"${elevatedAccount}\""
+            log_Message "\"${managementAccount}\" does not have a Secure Token to assign to \"${elevatedAccount}\"" "ERROR"
         fi
     else
         log_Message "Secure Token already assigned to: \"${elevatedAccount}\""
