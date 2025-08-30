@@ -4,15 +4,15 @@
 ### Author: Zac Reeves ###
 ### Created: 07-03-25  ###
 ### Updated: 08-30-25  ###
-### Version: 1.13      ###
+### Version: 1.14      ###
 ##########################
 
-readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
-readonly genericIconPath='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
+readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
+readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='Management Account Fix'
-readonly logPath='/var/log/management_Fix.log'
+readonly logFile='/var/log/management_Fix.log'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-effectiveIconPath="$defaultIconPath"
+activeIconPath="$SLUIconFile"
 existingAdmin=false
 precheckComplete=false
 trapExecuted=false
@@ -34,15 +34,17 @@ fi
 
 # Append current status to log file
 function log_Message() {
+    local message="$1"
+    local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logPath"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Ensure external arguments are passed
 function arg_Check() {
     if [[ -z "$mAccountName" ]] || [[ -z "$mAccountPass" ]] || [[ -z "$tAccountName" ]] || [[ -z "$tAccountPass" ]]; 
     then
-        log_Message "ERROR: Missing critical arguments"
+        log_Message "Missing critical arguments" "ERROR"
         exit_Func "error"
     fi
     readonly mAccountPath="/Users/${mAccountName}"
@@ -50,7 +52,7 @@ function arg_Check() {
 
 # Check for valid icon file, AppleScript dialog boxes will error without it
 function icon_Check() {
-    if [[ ! -f "$effectiveIconPath" ]];
+    if [[ ! -f "$activeIconPath" ]];
     then
         log_Message "No SLU icon found"
         if [[ -f '/usr/local/bin/jamf' ]];
@@ -60,14 +62,14 @@ function icon_Check() {
         else
             log_Message "No Jamf binary found"
         fi
-        if [[ ! -f "$effectiveIconPath" ]];
+        if [[ ! -f "$activeIconPath" ]];
         then
-            if [[ -f "$genericIconPath" ]];
+            if [[ -f "$genericIconFile" ]];
             then
                 log_Message "Generic icon found"
-                effectiveIconPath="$genericIconPath"
+                activeIconPath="$genericIconFile"
             else
-                log_Message "Generic icon not found"
+                log_Message "Generic icon not found" "ERROR"
                 return 1
             fi
         fi
@@ -121,11 +123,11 @@ function create_Account() {
             log_Message "$accountAdd successfully configured"
             return 0
         else
-            log_Message "$accountAdd failed to be configured"
+            log_Message "$accountAdd failed to be configured" "ERROR"
             return 1
         fi
     else
-        log_Message "$accountAdd could not be created"
+        log_Message "$accountAdd could not be created" "ERROR"
         return 1
     fi
 }
@@ -174,7 +176,7 @@ function change_Pass() {
     then
         return 0
     else
-        log_Message "ERROR: Change failed, sysadminctl output: $output"
+        log_Message "Change failed, sysadminctl output: $output" "ERROR"
         return 1
     fi
 }
@@ -205,7 +207,7 @@ function update_Keychain() {
             then
                 log_Message "Successfully deleted $account keychain. New keychain will be created on next login"
             else
-                log_Message "Failed to delete $account keychain"
+                log_Message "Failed to delete $account keychain" "ERROR"
                 return 1
             fi
         else
@@ -242,13 +244,13 @@ function reset_Pass() {
     log_Message "Changing INFO for $account"
     if ! change_Pass "$account" "$newPass" "$admin" "$adminPass";
     then
-        log_Message "ERROR: INFO change failed"
+        log_Message "INFO change failed" "ERROR"
         return 1
     fi
 
     if ! verify_Pass "$account" "$newPass";
     then
-        log_Message "ERROR: INFO change verification failed"
+        log_Message "INFO change verification failed" "ERROR"
         return 1
     else
         log_Message "INFO change successfully verified"
@@ -257,13 +259,13 @@ function reset_Pass() {
     log_Message "Updating keychain for $account"
     if ! update_Keychain "$account" "" "$newPass";
     then
-        log_Message "ERROR: Keychain update failed"
+        log_Message "Keychain update failed" "ERROR"
     fi
 
     log_Message "Clearing INFO policy for $account"
     if ! clear_PassPolicy "$account";
     then
-        log_Message "ERROR: Clear INFO policy failed"
+        log_Message "Clear INFO policy failed" "ERROR"
     else
         log_Message "INFO policy cleared"
     fi
@@ -282,7 +284,7 @@ function assign_Token(){
     then
         return 0
     else
-        log_Message "ERROR: Change failed, sysadminctl output: $output"
+        log_Message "Change failed, sysadminctl output: $output" "ERROR"
         return 1
     fi
 }
@@ -297,7 +299,7 @@ function textField_Dialog() {
         textFieldDialog=$(/usr/bin/osascript <<OOP
         try
             set promptString to "$promptString"
-            set iconPath to "$effectiveIconPath"
+            set iconPath to "$activeIconPath"
             set dialogTitle to "$dialogTitle"
             set dialogType to "$dialogType"
             if dialogType is "hidden" then
@@ -309,20 +311,20 @@ function textField_Dialog() {
             if buttonChoice is equal to "OK" then
                 return text returned of dialogResult
             else
-                return "timeout"
+                return "TIMEOUT"
             end if
         on error
-            return "Cancel"
+            return "CANCEL"
         end try
 OOP
         )
         case "$textFieldDialog" in
-            'Cancel')
+            'CANCEL')
                 log_Message "User responded with: $textFieldDialog"
                 return 1
                 ;;
-            'timeout')
-                log_Message "No response, re-prompting ($count/10)"
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)" "WARNING"
                 ((count++))
                 ;;
             '')
@@ -366,7 +368,7 @@ OOP
             log_Message "Unable to show alert dialog"
             ;;
         'timeout')
-            log_Message "Alert timed out"
+            log_Message "Alert timed out" "ERROR"
             ;;
         *)
             log_Message "Continued through alert dialog"
@@ -384,13 +386,13 @@ function monitor_Commands() {
         do
             if ps -p "$sudoPID" -o ruser= | grep "$user" &>/dev/null;
             then
-                log_Message "Security: SUDO USED BY $user"
-                log_Message "Security: Killing $sudoPID"
+                log_Message "SUDO USED BY $user" "SECURITY"
+                log_Message "Killing $sudoPID" "SECURITY"
                 if kill -9 "$sudoPID" &>/dev/null;
                 then
-                    log_Message "Security: Successfully killed $sudoPID"
+                    log_Message "Successfully killed $sudoPID" "SECURITY"
                 else
-                    log_Message "ERROR: Unable to kill $sudoPID"
+                    log_Message "Unable to kill $sudoPID" "ERROR"
                 fi
             fi
         done
@@ -441,22 +443,22 @@ function exit_Func() {
         log_Message "Checking permissions for $currentUser"
         if ! removeAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Unable to remove permissions from $currentUser"
+            log_Message "Unable to remove permissions from $currentUser" "ERROR"
         fi
 
         if [[ -n "$monitorPID" ]];
         then
             if ps "$monitorPID" &>/dev/null;
             then
-                log_Message "Security: Killing monitor"
+                log_Message "Killing monitor" "SECURITY"
                 if kill "$monitorPID" &>/dev/null;
                 then
-                    log_Message "Security: Monitor killed"
+                    log_Message "Monitor killed" "SECURITY"
                 else
-                    log_Message "ERROR: Monitor not killed. Kill $monitorPID in Activity Monitor"
+                    log_Message "Monitor not killed. Kill $monitorPID in Activity Monitor" "ERROR"
                 fi
             else
-                log_Message "Security: Monitor PID not found, already exited"
+                log_Message "Monitor PID not found, already exited" "SECURITY"
             fi
         fi
     fi
@@ -470,7 +472,7 @@ function exit_Func() {
         log_Message "Deleting $tAccountName"
         if ! /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null;
         then
-            log_Message "ERROR: $tAccountName not deleted"
+            log_Message "$tAccountName not deleted" "ERROR"
         else
             log_Message "$tAccountName deleted"
         fi
@@ -478,7 +480,7 @@ function exit_Func() {
 
     if [[ "$type" == 'error' ]];
     then
-        log_Message "ERROR: Exiting"
+        log_Message "Exiting" "ERROR"
         exit 1
     else
         log_Message "Exiting!"
@@ -489,8 +491,8 @@ function exit_Func() {
 function main() {
     ### PRECHECK ###
     trap "exit_Func" EXIT
-    trap 'log_Message "ERROR: Script interrupt"; exit_Func "error"' INT TERM
-    printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logPath"
+    trap 'log_Message "Script interrupt" "ERROR"; exit_Func "error"' INT TERM
+    printf "Log: $(date "+%F %T") Beginning Management Fix script\n" | tee "$logFile"
 
     # Check this first for proper removal of permissions on exit
     if admin_Check "$currentUser";
@@ -503,7 +505,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Pre-check passed!"
-        /usr/bin/osascript -e 'display dialog "'"$mAccountName"' already properly configured!\n\nExiting!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
+        /usr/bin/osascript -e 'display dialog "'"$mAccountName"' already properly configured!\n\nExiting!" buttons {"OK"} default button "OK" with icon POSIX file "'"$activeIconPath"'" with title "'"$dialogTitle"'"' & &>/dev/null
         exit_Func
     else
         log_Message "Pre-check failed, continuing with configuration of $mAccountName"
@@ -523,20 +525,20 @@ function main() {
     # Ensure $tAccountName exists
     if ! account_Check "$tAccountName";
     then
-        log_Message "ERROR: Missing $tAccountName"
+        log_Message "Missing $tAccountName" "ERROR"
         exit_Func "error"
     fi
 
     # Check for icon files for AppleScript dialog
     if ! icon_Check;
     then
-        log_Message "ERROR: Missing SLU icon"
+        log_Message "Missing SLU icon" "ERROR"
         exit_Func "error"
     fi
 
     ### START ###
     precheckComplete=true
-    /usr/bin/osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password." buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"'
+    /usr/bin/osascript -e 'display dialog "This policy aims to resolve any issues present with '"$mAccountName"'.\n\nYou may be prompted for your password." buttons {"OK"} with icon POSIX file "'"$activeIconPath"'" with title "'"$dialogTitle"'"' &>/dev/null
     # Ensure $mAccountName exists
     log_Message "Checking for $mAccountName"
     if account_Check "$mAccountName";
@@ -546,7 +548,7 @@ function main() {
         log_Message "$mAccountName does not exist"
         if ! create_Account "$mAccountName" "$mAccountPass" "$mAccountPath" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Failed to create $mAccountName"
+            log_Message "Failed to create $mAccountName" "ERROR"
             exit_Func "error"
         fi
     fi
@@ -560,7 +562,7 @@ function main() {
         log_Message "$mAccountName is not an admin"
         if ! addAccount_AdminGroup "$mAccountName" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Unable to grant admin rights to $mAccountName"
+            log_Message "Unable to grant admin rights to $mAccountName" "ERROR"
             exit_Func "error"
         else
             log_Message "$mAccountName is now an admin"
@@ -571,7 +573,7 @@ function main() {
     log_Message "Checking $currentUser for Secure Token"
     if ! token_Check "$currentUser";
     then
-        log_Message "ERROR: $currentUser does not have a Secure Token"
+        log_Message "$currentUser does not have a Secure Token" "ERROR"
         alert_Dialog "Your account does not have a Secure Token to grant to ${mAccountName}.\n\nRun 'sudo jamf policy -event SecureTokenManager' to check Token status."
         exit_Func "error"
     else
@@ -595,11 +597,12 @@ function main() {
     then
         log_Message "$currentUser has proper permission"
     else
+        log_Message "Starting monitor" "SECURITY"
         monitor_Commands "$currentUser" "25" &
         monitorPID=$!
         if ! addAccount_AdminGroup "$currentUser" "$tAccountName" "$tAccountPass";
         then
-            log_Message "ERROR: Unable to grant permissions to $currentUser"
+            log_Message "Unable to grant permissions to $currentUser" "ERROR"
             exit_Func "error"
         fi
     fi
@@ -608,7 +611,7 @@ function main() {
     log_Message "Assigning Secure Token to $tAccountName"
     if ! assign_Token "$currentUser" "$currentUserPass" "$tAccountName" "$tAccountPass";
     then
-        log_Message "ERROR: Unable to assign Secure Token to $tAccountName"
+        log_Message "Unable to assign Secure Token to $tAccountName" "ERROR"
         exit_Func "error"
     else
         log_Message "Secure Token assigned to $tAccountName"
@@ -618,7 +621,7 @@ function main() {
             log_Message "$mAccountName INFO is incorrect"
             if ! reset_Pass "$mAccountName" "$mAccountPass" "$tAccountName" "$tAccountPass";
             then
-                log_Message "ERROR: Exiting at INFO reset"
+                log_Message "Exiting at INFO reset" "ERROR"
                 exit_Func "error"
             else
                 log_Message "Successfully reset $mAccountName INFO"
@@ -637,13 +640,13 @@ function main() {
         log_Message "$mAccountName does not have a Secure Token"
         if ! assign_Token "$currentUser" "$currentUserPass" "$mAccountName" "$mAccountPass";
         then
-            log_Message "ERROR: Unable to assign Secure Token to $mAccountName"
+            log_Message "Unable to assign Secure Token to $mAccountName" "ERROR"
         else
             if token_Check "$mAccountName";
             then
                 log_Message "Secure Token assigned to $mAccountName"
             else
-                log_Message "ERROR: Secure Token not assigned to $mAccountName"
+                log_Message "Secure Token not assigned to $mAccountName" "ERROR"
             fi
         fi
     fi
@@ -653,7 +656,7 @@ function main() {
     if final_Check "$mAccountName";
     then
         log_Message "Final check passed!"
-        /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$effectiveIconPath"'" with title "'"$dialogTitle"'"' &
+        /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} default button "OK" with icon POSIX file "'"$activeIconPath"'" with title "'"$dialogTitle"'"' & &>/dev/null
         exit_Func
     else
         log_Message "$mAccountName still misconfigured"
