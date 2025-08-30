@@ -3,34 +3,37 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 03-12-25  ###
-### Updated: 08-28-25  ###
+### Updated: 08-30-25  ###
 ### Version: 1.7       ###
 ##########################
 
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
-activeIcon="$SLUIconFile"
 readonly dialogTitle='Token Manager'
 readonly logFile='/var/log/token_Manager.log'
-readonly helperPath=''
+readonly maxAttempts=10
+readonly tAccountName="$4"
+tAccountPass="$5"
+activeIcon="$SLUIconFile"
 monitorPID=''
 
 # Check the script is ran with admin privileges
 function sudo_Check() {
     if [ "$(id -u)" -ne 0 ];
     then
-        printf "Please run this script as root or using sudo!\n"
+        log_Message "Please run this script as root or using sudo!" "ERROR"
         alert_Dialog "Please run this script as root or using sudo!"
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 # Append current status to log file
 function log_Message() {
     local message="$1"
-    local type="${2:-Log}"
+    local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Check if account is in the admin group
@@ -61,6 +64,7 @@ function addAccount_AdminGroup() {
     local adminAccount="$2"
     local adminPass="$3"
     /usr/sbin/dseditgroup -o edit -a "$account" -u "$adminAccount" -P "$adminPass" -t user -L admin &>/dev/null
+    sleep 1
     if admin_Check "$account";
     then
         return 0
@@ -72,11 +76,11 @@ function addAccount_AdminGroup() {
 # Remove account from admin group
 function removeAccount_AdminGroup() {
     local account="$1"
-    local admin="$2"
+    local adminAccount="$2"
     local adminPass="$3"
-    if [ "$existingAdmin" != true ];
+    if [ "$existingAdmin" -eq 0 ];
     then
-        /usr/sbin/dseditgroup -o edit -d "$account" -u "$admin" -P "$adminPass" -t user -L admin &>/dev/null
+        /usr/sbin/dseditgroup -o edit -d "$account" -u "$adminAccount" -P "$adminPass" -t user -L admin &>/dev/null
         if admin_Check "$account";
         then
             return 1
@@ -116,170 +120,27 @@ function icon_Check() {
     return 0
 }
 
-# AppleScript - Create alert dialog window
-function alert_Dialog() {
-    local promptString="$1"
-    log_Message "Displaying alert dialog"
-    alertDialog=$(/usr/bin/osascript <<OOP
-    try
-        set promptString to "$promptString"
-        set choice to (display alert promptString as critical buttons "OK" default button 1 giving up after 900)
-        if (gave up of choice) is true then
-            return "TIMEOUT"
-        else
-            return (button returned of choice)
-        end if
-    on error
-        return "ERROR"
-    end try
-OOP
-    )
-    case "$alertDialog" in
-        'ERROR')
-            log_Message "Unable to show alert dialog"
-            ;;
-        'TIMEOUT')
-            log_Message "Alert timed out"
-            ;;
-        *)
-            log_Message "Continued through alert dialog"
-            ;;
-    esac
-}
+# Format different groups of secure token users for display in AppleScript
+function create_TokenPhrase() {
+    local message="$1"
+    local arrayName="$2"
+    local craftArrayName="${arrayName}[@]"
+    local arrayCopy=("${!craftArrayName}")
+    local userList
 
-# AppleScript - Ask user to choose from a list of items
-function dropdown_Prompt() {
-    local promptString="$1"
-    local count=1
-    while [ $count -le 10 ];
-    do
-        dropdownPrompt=$(/usr/bin/osascript <<OOP
-        set promptString to "$promptString"
-        set dialogTitle to "$dialogTitle"
-        set dropdownOptions to {"Current Token Status", "Add Token", "Remove Token"}
-        set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Current Token Status" with title dialogTitle)
-        if userChoice is false then
-            return "QUIT"
-        else if userChoice is {} then
-            return "TIMEOUT"
-        else
-            return (item 1 of userChoice)
-        end if
-OOP
-        )
-        case "$dropdownPrompt" in
-            'QUIT')
-                log_Message "User chose: \"Quit\""
-                return 1
-                ;;
-            'TIMEOUT')
-                log_Message "Timed out, re-prompting ($count/10)"
-                ((count++))
-                ;;
-            *)
-                log_Message "User chose: \"${dropdownPrompt}\""
-                return 0
-                ;;
-        esac
-    done
-    return 1
-}
-
-# AppleScript - Informing the user and giving them two choices
-function binary_Dialog() {
-    local promptString="$1"
-    local count=1
-    while [ $count -le 10 ];
-    do
-        binDialog=$(/usr/bin/osascript <<OOP
-        try
-            set promptString to "$promptString"
-            set iconPath to "$activeIcon"
-            set dialogTitle to "$dialogTitle"
-            set dialogResult to display dialog promptString buttons {"Go Back", "Done"} default button "Done" with icon POSIX file iconPath with title dialogTitle giving up after 900
-            set buttonChoice to button returned of dialogResult
-            if buttonChoice is equal to "" then
-                return "TIMEOUT"
-            else
-                return buttonChoice
-            end if
-        on error
-            return "CANCEL"
-        end try
-OOP
-        )
-        case "$binDialog" in
-            'CANCEL' | 'Go Back')
-                log_Message "User responded with: $binDialog"
-                return 1
-                ;;
-            'TIMEOUT')
-                log_Message "No response, re-prompting ($count/10)"
-                ((count++))
-                ;;
-            *)
-                log_Message "User responded with: $binDialog"
-                return 0
-                ;;
-        esac
-    done
-    return 1
-}
-
-# AppleScript - Text field dialog prompt for inputting information
-function textField_Dialog() {
-    local promptString="$1"
-    local dialogType="$2"
-    local count=1
-    while [ $count -le 10 ];
-    do
-        textFieldDialog=$(/usr/bin/osascript <<OOP
-        try
-            set promptString to "$promptString"
-            set iconPath to "$activeIcon"
-            set dialogTitle to "$dialogTitle"
-            set dialogType to "$dialogType"
-            if dialogType is "hidden" then
-                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file iconPath with title dialogTitle giving up after 900
-            else
-                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with answer default answer "" with icon POSIX file iconPath with title dialogTitle giving up after 900
-            end if
-            set buttonChoice to button returned of dialogResult
-            if buttonChoice is equal to "OK" then
-                return text returned of dialogResult
-            else
-                return "TIMEOUT"
-            end if
-        on error
-            return "CANCEL"
-        end try
-OOP
-        )
-        case "$textFieldDialog" in
-            'CANCEL')
-                log_Message "User responded with: \"${textFieldDialog}\""
-                return 1
-                ;;
-            'TIMEOUT')
-                log_Message "No response, re-prompting ($count/10)"
-                ((count++))
-                ;;
-            '')
-                log_Message "Nothing entered in text field" "ERROR"
-                alert_Dialog "Please enter something"
-                ;;
-            *)
-                if [[ "$dialogType" == 'hidden' ]];
-                then
-                    log_Message "Password entered"
-                else
-                    log_Message "User responded with: $textFieldDialog"
-                fi
-                return 0
-                ;;
-        esac
-    done
-    return 1
+    log_Message "$message"
+    if [[ ${#arrayCopy[@]} -eq 0 ]];
+    then
+        tokenPhrase=$(printf "%s\nNone" "$message")
+        log_Message "None"
+    else
+        userList=$(printf "%s\n" "${arrayCopy[@]}")
+        tokenPhrase=$(printf "%s\n%s" "$message" "$userList")
+        for user in "${arrayCopy[@]}";
+        do
+            log_Message " - $user"
+        done
+    fi
 }
 
 # Grabs lists of each users current Secure Token and Admin status
@@ -292,7 +153,7 @@ function get_UserArrays() {
     local secureTokenUIDs=($(/usr/sbin/diskutil apfs listUsers / | grep -E '.*-.*' | awk '{print $2}'))
     for username in $(/usr/bin/dscl . -list /Users | grep -v "^_");
     do
-        if [[ "$username" == 'daemon' || "$username" == 'nobody' || "$username" == 'root' ]];
+        if [[ "$username" == 'daemon' || "$username" == 'nobody' || "$username" == 'root' || "$username" == 'temp_management' ]];
         then
             continue
         fi
@@ -329,65 +190,21 @@ function get_UserArrays() {
         fi
     done
 
-    log_Message "Secure Token accounts:"
-    if [[ ${#secureTokenUserArray[@]} -eq 0 ]];
-    then
-        secureTokenPhrase=$(printf "Secure Token accounts:\nNone")
-        log_Message "None"
-    else
-        userList=$(printf "%s\n" "${secureTokenUserArray[@]}")
-        secureTokenPhrase=$(printf "Secure Token accounts:\n%s" "$userList")
-        for user in "${secureTokenUserArray[@]}";
-        do
-            log_Message " - $user"
-        done
-    fi
+    create_TokenPhrase "Secure Token accounts:" "secureTokenUserArray"
+    secureTokenPhrase="$tokenPhrase"
 
-    log_Message "Non-Secure Token accounts:"
-    if [[ ${#nonSecureTokenUserArray[@]} -eq 0 ]];
-    then
-        nonSecureTokenPhrase=$(printf "Non-Secure Token accounts:\nNone")
-        log_Message "None"
-    else
-        userList=$(printf "%s\n" "${nonSecureTokenUserArray[@]}")
-        nonSecureTokenPhrase=$(printf "Non-Secure Token accounts:\n%s" "$userList")
-        for user in "${nonSecureTokenUserArray[@]}";
-        do
-            log_Message " - $user"
-        done
-    fi
+    create_TokenPhrase "Non-Secure Token accounts:" "nonSecureTokenUserArray"
+    nonSecureTokenPhrase="$tokenPhrase"
+    
+    create_TokenPhrase "Admin accounts:" "adminAccountArray"
+    adminAccountPhrase="$tokenPhrase"
 
-    log_Message "Admin accounts:"
-    if [[ ${#adminAccountArray[@]} -eq 0 ]];
-    then
-        adminAccountPhrase=$(printf "Admin accounts:\nNone")
-        log_Message "None"
-    else
-        userList=$(printf "%s\n" "${adminAccountArray[@]}")
-        adminAccountPhrase=$(printf "Admin accounts:\n%s" "$userList")
-        for user in "${adminAccountArray[@]}";
-        do
-            log_Message " - $user"
-        done
-    fi
-
-    log_Message "Admin accounts with Secure Tokens:"
-    if [[ ${#secureTokenAdminArray[@]} -eq 0 ]];
-    then
-        secureTokenAdminPhrase=$(printf "Admin accounts with Secure Tokens:\nNone")
-        log_Message "None"
-    else
-        userList=$(printf "%s\n" "${secureTokenAdminArray[@]}")
-        secureTokenAdminPhrase=$(printf "Admin accounts with Secure Tokens:\n%s" "$userList")
-        for user in "${secureTokenAdminArray[@]}";
-        do
-            log_Message " - $user"
-        done
-    fi
+    create_TokenPhrase "Admin accounts with Secure Tokens:" "secureTokenAdminArray"
+    secureTokenAdminPhrase="$tokenPhrase"
 }
 
 # Function for adding and removing Secure Tokens
-function token_Action_Old() {
+function token_Action() {
     local tokenAccount="$1"
     local tokenPassword="$2"
     local adminAccount="$3"
@@ -413,7 +230,8 @@ function token_Action_Old() {
     fi
 }
 
-function token_Action() {
+function INPROG_token_Action() {
+    #readonly helperPath=''
     local tokenAccount="$1"
     local tokenPassword="$2"
     local adminAccount="$3"
@@ -431,7 +249,6 @@ function token_Action() {
         log_Message "Invalid token action" "ERROR"
         return 1
     fi
-
     if [[ -f "$helperPath" ]];
     then
         result=$(printf "%s\n%s" "$tokenPassword" "$adminPassword" | \
@@ -440,7 +257,6 @@ function token_Action() {
         log_Message "No security tool found" "ERROR"
         return 1
     fi
-
     if [[ "$result" == "SUCCESS" ]];
     then
         return 0
@@ -450,12 +266,36 @@ function token_Action() {
     fi
 }
 
+# Monitor for sudo commands run by an account during vulnerable moments
+function monitor_Commands() {
+    local user="$1"
+    local endTime=$(($(date +%s) + $2))
+    while [[ $(date +%s) -lt $endTime ]];
+    do
+        for sudoPID in $(pgrep -u "root" "sudo" 2>/dev/null);
+        do
+            if ps -p "$sudoPID" -o ruser= | grep "$user" &>/dev/null;
+            then
+                log_Message "SUDO USED BY $user" "SECURITY"
+                log_Message "Killing $sudoPID" "SECURITY"
+                if kill -9 "$sudoPID" &>/dev/null;
+                then
+                    log_Message "Successfully killed $sudoPID" "SECURITY"
+                else
+                    log_Message "Unable to kill $sudoPID" "ERROR"
+                fi
+            fi
+        done
+        sleep 0.05
+    done
+}
+
 # Main logic of Secure Token action being taken
 function token_Action_Display() {
     local firstPrompt="$1"
     local secondPrompt="$2"
     local tokenActionType="$3"
-    existingAdmin=0
+    existingAdmin=1
     if ! textField_Dialog "$firstPrompt"
     then
         log_Message "Exiting at first \"${tokenActionType}\" text field dialog"
@@ -473,9 +313,10 @@ function token_Action_Display() {
 
     if ! admin_Check "$adminAccount";
     then
-        log_Message "$adminAccount is not an admin" "ERROR"
+        log_Message "$adminAccount is not an admin" "WARNING"
         existingAdmin=0
     else
+        log_Message "$adminAccount is an admin"
         existingAdmin=1
     fi
 
@@ -526,20 +367,28 @@ function token_Action_Display() {
 
     if [ $existingAdmin -eq 0 ];
     then
-        monitor_Commands "$adminAccount" "25" &
+        log_Message "Starting monitor" "SECURITY"
+        monitor_Commands "$adminAccount" "30" &
         monitorPID=$!
-        if ! addAccount_AdminGroup "$adminAccount" "$tAccountName" "$tAccountPass";
+        if ! admin_Check "$adminAccount";
         then
-            log_Message "Unable to grant permissions to $adminUser" "ERROR"
-            return 1
+            if ! addAccount_AdminGroup "$adminAccount" "$tAccountName" "$tAccountPass";
+            then
+                log_Message "Unable to grant permissions to $adminAccount" "ERROR"
+                alert_Dialog "Unable to proceed as $adminAccount has insufficient permissions"
+                return 1
+            fi
+        else
+            log_Message "$adminAccount is already an admin" "ERROR"
         fi
     fi
 
-    if ! token_Action_Old "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
+    if ! token_Action "$tokenAccount" "$tokenPassword" "$adminAccount" "$adminPassword" "$tokenActionType";
     then
         clean_Env
         log_Message "$(printf "Error with Secure token action!\nPriviliged Account: %s\nNon-Priviliged Account: %s\nToken Action: %s" "$adminAccount" "$tokenAccount" "$tokenActionType")" "ERROR"
         alert_Dialog "Error with Secure token action!\n\nPriviliged Account:\n${adminAccount}\n\nNon-Priviliged Account:\n${tokenAccount}\n\nToken Action:\n${tokenActionType}"
+        return 1
     else
         clean_Env
         log_Message "$tokenActionType completed!"
@@ -552,32 +401,272 @@ function token_Action_Display() {
             return 0
         fi
     fi
-    clean_Env
-    return 0
+    return 1
+}
+
+# AppleScript - Create alert dialog window
+function alert_Dialog() {
+    local promptString="$1"
+    log_Message "Displaying alert dialog"
+    alertDialog=$(/usr/bin/osascript <<OOP
+    try
+        set promptString to "$promptString"
+        set choice to (display alert promptString as critical buttons "OK" default button 1 giving up after 900)
+        if (gave up of choice) is true then
+            return "TIMEOUT"
+        else
+            return (button returned of choice)
+        end if
+    on error
+        return "ERROR"
+    end try
+OOP
+    )
+    case "$alertDialog" in
+        'ERROR')
+            log_Message "Unable to show alert dialog"
+            ;;
+        'TIMEOUT')
+            log_Message "Alert timed out"
+            ;;
+        *)
+            log_Message "Continued through alert dialog"
+            ;;
+    esac
+}
+
+# AppleScript - Ask user to choose from a list of items
+function dropdown_Prompt() {
+    local promptString="$1"
+    local count=1
+    while [ $count -le $maxAttempts ];
+    do
+        dropdownPrompt=$(/usr/bin/osascript <<OOP
+        set promptString to "$promptString"
+        set dialogTitle to "$dialogTitle"
+        set dropdownOptions to {"Current Token Status", "Add Token", "Remove Token"}
+        set userChoice to (choose from list dropdownOptions with prompt promptString cancel button name "Quit" default items "Current Token Status" with title dialogTitle)
+        if userChoice is false then
+            return "QUIT"
+        else if userChoice is {} then
+            return "TIMEOUT"
+        else
+            return (item 1 of userChoice)
+        end if
+OOP
+        )
+        case "$dropdownPrompt" in
+            'QUIT')
+                log_Message "User chose: \"Quit\""
+                return 1
+                ;;
+            'TIMEOUT')
+                log_Message "Timed out, re-prompting ($count/10)"
+                ((count++))
+                ;;
+            *)
+                log_Message "User chose: \"${dropdownPrompt}\""
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# AppleScript - Informing the user and giving them two choices
+function binary_Dialog() {
+    local promptString="$1"
+    local count=1
+    while [ $count -le $maxAttempts ];
+    do
+        binDialog=$(/usr/bin/osascript <<OOP
+        try
+            set promptString to "$promptString"
+            set iconPath to "$activeIcon"
+            set dialogTitle to "$dialogTitle"
+            set dialogResult to display dialog promptString buttons {"Go Back", "Done"} default button "Done" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            set buttonChoice to button returned of dialogResult
+            if buttonChoice is equal to "" then
+                return "TIMEOUT"
+            else
+                return buttonChoice
+            end if
+        on error
+            return "CANCEL"
+        end try
+OOP
+        )
+        case "$binDialog" in
+            'CANCEL' | 'Go Back')
+                log_Message "User responded with: $binDialog"
+                return 1
+                ;;
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)"
+                ((count++))
+                ;;
+            *)
+                log_Message "User responded with: $binDialog"
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# AppleScript - Text field dialog prompt for inputting information
+function textField_Dialog() {
+    local promptString="$1"
+    local dialogType="$2"
+    local count=1
+    while [ $count -le $maxAttempts ];
+    do
+        textFieldDialog=$(/usr/bin/osascript <<OOP
+        try
+            set promptString to "$promptString"
+            set iconPath to "$activeIcon"
+            set dialogTitle to "$dialogTitle"
+            set dialogType to "$dialogType"
+            if dialogType is "hidden" then
+                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with hidden answer default answer "" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            else
+                set dialogResult to display dialog promptString buttons {"Cancel", "OK"} default button "OK" with answer default answer "" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            end if
+            set buttonChoice to button returned of dialogResult
+            if buttonChoice is equal to "OK" then
+                return text returned of dialogResult
+            else
+                return "TIMEOUT"
+            end if
+        on error
+            return "CANCEL"
+        end try
+OOP
+        )
+        case "$textFieldDialog" in
+            'CANCEL')
+                log_Message "User responded with: \"${textFieldDialog}\""
+                return 1
+                ;;
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)"
+                ((count++))
+                ;;
+            '')
+                log_Message "Nothing entered in text field" "ERROR"
+                alert_Dialog "Please enter something"
+                ;;
+            *)
+                if [[ "$dialogType" == 'hidden' ]];
+                then
+                    log_Message "Password entered"
+                else
+                    log_Message "User responded with: $textFieldDialog"
+                fi
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+# Ensure temporary account is removed
+function delete_TempAccount() {
+    if account_Check "$tAccountName";
+    then
+        log_Message "Deleting $tAccountName"
+        if ! /usr/sbin/sysadminctl -deleteUser "$tAccountName" -secure &>/dev/null;
+        then
+            log_Message "$tAccountName not deleted" "ERROR"
+        else
+            log_Message "$tAccountName deleted"
+        fi
+    fi
 }
 
 function clean_Env() {
-    if [[ -n "$adminPassword" ]];
+    if [[ -n "$adminAccount" ]] && [[ -n "$existingAdmin" ]] && [ $existingAdmin -eq 0 ];
     then
-        adminPassword=$(head -c ${#adminPassword} /dev/zero | tr '\0' 'X')
+        if admin_Check "$adminAccount";
+        then
+            if ! removeAccount_AdminGroup "$adminAccount" "$tAccountName" "$tAccountPass";
+            then
+                log_Message "Unable to remove ${adminAccount} from admin group" "ERROR"
+            else
+                log_Message "${adminAccount} removed from admin group"
+            fi
+        else
+            log_Message "${adminAccount} is not in admin group, leaving"
+        fi
+    else
+        log_Message "Leaving permissions alone"
     fi
-    unset adminPassword 
-    if [[ -n "$tokenPassword" ]];
+
+    local vars=("adminPassword" "tokenPassword")
+    local varName
+    for varName in "${vars[@]}";
+    do
+        if [[ -n "${!varName}" ]];
+        then
+            local varValue="${!varName}"
+            local varLength="${#varValue}"
+            printf -v "$varName" '%*s' "$varLength" ''
+            local xString=$(printf '%*s' "$varLength" '' | tr ' ' 'X')
+            printf -v "$varName" '%s' "$xString"
+        fi
+        unset "$varName"
+    done
+
+    if [[ -n "$monitorPID" ]];
     then
-        tokenPassword=$(head -c ${#tokenPassword} /dev/zero | tr '\0' 'X')
+        if ps "$monitorPID" &>/dev/null;
+        then
+            log_Message "Killing monitor" "SECURITY"
+            if kill "$monitorPID" &>/dev/null;
+            then
+                log_Message "Monitor killed" "SECURITY"
+
+            else
+                log_Message "Monitor not killed. Kill ${monitorPID} in Activity Monitor" "ERROR"
+            fi
+        else
+            log_Message "Monitor PID not found, already exited" "SECURITY"
+        fi
     fi
-    unset tokenPassword 
+}
+
+function clean_Exit() {
+    clean_Env
+    if [[ -n "$tAccountPass" ]];
+    then
+        local varLength="${#tAccountPass}"
+        printf -v "tAccountPass" '%*s' "$varLength" ''
+        tAccountPass=$(printf '%*s' "$varLength" '' | tr ' ' 'X')
+        unset tAccountPass
+    fi
+    delete_TempAccount
 }
 
 function main() {
-    sudo_Check
-    trap "clean_Env" EXIT INT TERM HUP
+    trap "clean_Exit" EXIT INT TERM HUP
     printf "Log: $(date "+%F %T") Beginning Token Manager script\n" | tee "$logFile"
+
+    if [[ -z "$tAccountName" ]] || [[ -z "$tAccountPass" ]];
+    then
+        log_Message "Missing critical arguments" "ERROR"
+        exit 1
+    fi
+
+    if ! sudo_Check;
+    then
+        log_Message "Exiting at sudo check" "ERROR"
+        exit 1
+    fi
 
     if ! icon_Check;
     then
         alert_Dialog "Missing required icon files!"
-        log_Message "Exiting for no icon"
+        log_Message "Exiting for no icon" "ERROR"
         exit 1
     fi
 
