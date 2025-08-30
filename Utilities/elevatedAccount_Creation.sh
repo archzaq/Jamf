@@ -4,18 +4,19 @@
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
 ### Updated: 08-30-25  ###
-### Version: 2.1       ###
+### Version: 2.2       ###
 ##########################
 
 managementAccount="$4"
 managementAccountPass="$5"
 elevatedAccount="$6"
-elevatedAccountPass=""
+elevatedAccountPass=''
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly logFile='/var/log/elevatedAccount_Creation.log'
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='SLU ITS: Elevated Account Creation'
+readonly maxAttempts=10
 
 # Append current status to log file
 function log_Message() {
@@ -116,7 +117,7 @@ function create_AdminAccount() {
                 chmod 750 "$accountAddPath/$dir"
             done
             chown -R "$accountAdd":staff "$accountAddPath"
-            chown +a "group:everyone deny delete" "$accountAddPath"
+            chmod +a "group:everyone deny delete" "$accountAddPath"
             chmod 750 "$accountAddPath"
             log_Message "Successfully configured: \"${accountAdd}\""
             return 0
@@ -163,12 +164,53 @@ function validate_Password() {
     return 0
 }
 
+# AppleScript - Informing the user and giving them two choices
+function binary_Dialog() {
+    local promptString="$1"
+    local count=1
+    while [ $count -le $maxAttempts ];
+    do
+        binDialog=$(/usr/bin/osascript <<OOP
+        try
+            set promptString to "$promptString"
+            set iconPath to "$activeIcon"
+            set dialogTitle to "$dialogTitle"
+            set dialogResult to display dialog promptString buttons {"Cancel", "Yes"} default button "Yes" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            set buttonChoice to button returned of dialogResult
+            if buttonChoice is equal to "" then
+                return "TIMEOUT"
+            else
+                return buttonChoice
+            end if
+        on error
+            return "CANCEL"
+        end try
+OOP
+        )
+        case "$binDialog" in
+            'CANCEL' | 'Cancel')
+                log_Message "User responded with: $binDialog"
+                return 1
+                ;;
+            'TIMEOUT')
+                log_Message "No response, re-prompting ($count/10)"
+                ((count++))
+                ;;
+            *)
+                log_Message "User responded with: $binDialog"
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
 # AppleScript - Text field dialog prompt for inputting information
 function textField_Dialog() {
     local promptString="$1"
     local dialogType="$2"
     local count=1
-    while [ $count -le 10 ];
+    while [ $count -le $maxAttempts ];
     do
         textFieldDialog=$(/usr/bin/osascript <<OOP
         try
@@ -252,17 +294,21 @@ OOP
     esac
 }
 
-function cleanup_Env() {
-    managementAccountPass=''
+function clean_Env() {
     elevatedAccountPass=''
-    elevatedAccountPassTest=''
-    unset managementAccountPass
+    elevatedAccountPassVerify=''
     unset elevatedAccountPass
-    unset elevatedAccountPassTest
+    unset elevatedAccountPassVerify
+}
+
+function clean_Exit() {
+    clean_Env
+    managementAccountPass=''
+    unset managementAccountPass
 }
 
 function main() {
-    trap "cleanup_Env" EXIT INT TERM
+    trap "clean_Exit" EXIT INT TERM HUP
     printf "Log: $(date "+%F %T") Beginning Elevated Account Creation script\n" | tee "$logFile"
 
     if ! arg_Check;
@@ -297,8 +343,20 @@ function main() {
     if account_Check "$elevatedAccount";
     then
         log_Message "ERROR: Elevated account already exists, exiting"
-        alert_Dialog "Duplicate Account" "${elevatedAccount} account already exists!"
-        exit 1
+        if ! binary_Dialog "Elevated account already exists!\n\nWould you like to delete this account and create a new one?";
+        then
+            log_Message "Exiting at binary dialog"
+            exit 1
+        else
+            log_Message "Deleting elevate account"
+            if sysadminctl -deleteUser "$elevatedAccount" -secure &>/dev/null;
+            then
+                log_Message "Elevated account deleted"
+            else
+                log_Message "ERROR: Unable to delete elevate account"
+                exit 1
+            fi
+        fi
     fi
 
     log_Message "Checking permissions for: \"$managementAccount\""
@@ -330,16 +388,16 @@ function main() {
                     log_Message "Exiting at INFO verification"
                     exit 0
                 else
-                    elevatedAccountPassTest="${textFieldDialog}"
+                    elevatedAccountPassVerify="${textFieldDialog}"
                     textFieldDialog=''
                     unset textFieldDialog
                 fi
 
-                if [[ "$elevatedAccountPass" == "$elevatedAccountPassTest" ]];
+                if [[ "$elevatedAccountPass" == "$elevatedAccountPassVerify" ]];
                 then
                     log_Message "INFO match, continuing"
-                    elevatedAccountPassTest=''
-                    unset elevatedAccountPassTest
+                    elevatedAccountPassVerify=''
+                    unset elevatedAccountPassVerify
                     validPass=true
                 else
                     log_Message "ERROR: INFO do not match"
@@ -376,12 +434,9 @@ function main() {
     else
         log_Message "Secure Token already assigned to: \"${elevatedAccount}\""
     fi
-    elevatedAccountPass=''
-    managementAccountPass=''
-    unset elevatedAccountPass
-    unset managementAccountPass
+    clean_Env
     
-    /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} with icon POSIX file "'"$activeIcon"'" with title "'"$dialogTitle"'"'
+    /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} default button "OK" with icon POSIX file "'"$activeIcon"'" with title "'"$dialogTitle"'"' &>/dev/null
     log_Message "Elevated Account Creation finished! Exiting"
     exit 0
 }
