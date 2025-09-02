@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
-### Updated: 08-30-25  ###
-### Version: 2.3       ###
+### Updated: 09-02-25  ###
+### Version: 2.4       ###
 ##########################
 
 managementAccount="$4"
@@ -242,7 +242,7 @@ OOP
                 return 1
                 ;;
             'timeout')
-                log_Message "No response, re-prompting ($count/10)" "WARNING"
+                log_Message "No response, re-prompting ($count/10)" "WARN"
                 ((count++))
                 ;;
             '')
@@ -288,7 +288,7 @@ OOP
             log_Message "Unable to show alert dialog"
             ;;
         'TIMEOUT')
-            log_Message "Alert timed out" "WARNING"
+            log_Message "Alert timed out" "WARN"
             ;;
         *)
             log_Message "Continued through alert dialog"
@@ -344,8 +344,8 @@ function main() {
     log_Message "Checking for: \"$elevatedAccount\""
     if account_Check "$elevatedAccount";
     then
-        log_Message "Elevated account already exists" "ERROR"
-        if ! binary_Dialog "Elevated account already exists!\n\nWould you like to delete this account and create a new one?";
+        log_Message "Elevate account already exists" "WARN"
+        if ! binary_Dialog "'elevate' account already exists!\n\nWould you like to delete this account and create a new one?";
         then
             log_Message "Exiting at binary dialog"
             exit 1
@@ -353,7 +353,7 @@ function main() {
             log_Message "Deleting elevate account"
             if sysadminctl -deleteUser "$elevatedAccount" -secure &>/dev/null;
             then
-                log_Message "Elevated account deleted"
+                log_Message "Elevate account deleted"
             else
                 log_Message "Unable to delete elevate account" "ERROR"
                 exit 1
@@ -439,7 +439,7 @@ function main() {
     clean_Env
     
     /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} default button "OK" with icon POSIX file "'"$activeIcon"'" with title "'"$dialogTitle"'"' &>/dev/null
-    log_Message "Elevated Account Creation finished! Exiting"
+    log_Message "Elevated Account Creation finished!" "EXIT"
     exit 0
 }
 
