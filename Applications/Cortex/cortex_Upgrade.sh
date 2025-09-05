@@ -3,14 +3,15 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-18-25  ###
-### Updated: 08-20-25  ###
-### Version: 1.1       ###
+### Updated: 09-05-25  ###
+### Version: 1.2       ###
 ##########################
 
 pw="$4"
 readonly appName='Cortex XDR'
 readonly oldAppName='Traps'
 readonly appNameVersion="${appName} 8.8"
+readonly appNameFallbackVersion="${appName} 8.5.1"
 readonly cortexApplicationPath='/Applications/Cortex XDR.app'
 readonly cortexLibraryPath='/Library/Application Support/PaloAltoNetworks/Traps/bin'
 readonly cortexUninstallerTool="${cortexLibraryPath}/cortex_xdr_uninstaller_tool"
@@ -19,12 +20,15 @@ readonly cytoolPath="${cortexLibraryPath}/cytool"
 readonly uninstallWait=5
 readonly installWait=10
 readonly jamfInstall='Cortex_Install-8.8'
+readonly jamfFallbackInstall='Cortex_Install-8.5.1'
 readonly logFile='/var/log/cortex_Upgrade.log'
 
 # Append current status to log file
 function log_Message() {
+    local message="$1"
+    local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logFile"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Check for Cortex uninstaller, if found, run uninstaller
@@ -38,11 +42,11 @@ function check_Uninstall() {
         then
             log_Message "Successfully uninstalled: ${name}"
         else
-            log_Message "ERROR: Unable to uninstall: ${name}"
+            log_Message "Unable to uninstall: ${name}" "ERROR"
             return 1
         fi
     else
-        log_Message "Unable to locate: \"${name}\""
+        log_Message "Unable to locate: \"${name}\"" "WARN"
     fi
     return 0
 }
@@ -56,17 +60,17 @@ function cytool_Checkin() {
         then
             log_Message "cytool check-in successful"
         else
-            log_Message "Unable to check-in using cytool"
+            log_Message "Unable to check-in using cytool" "WARN"
             log_Message "Attempting cytool reconnect"
             if "$cytoolPath" reconnect &>/dev/null;
             then
                 log_Message "cytool reconnect successful"
             else
-                log_Message "ERROR: Unable to reconnect using cytool"
+                log_Message "Unable to reconnect using cytool" "ERROR"
             fi
         fi
     else
-        log_Message "ERROR: Unable to locate: \"${cytoolPath}\""
+        log_Message "Unable to locate: \"${cytoolPath}\"" "ERROR"
     fi
 }
 
@@ -93,7 +97,7 @@ function main() {
 
     if [[ -z "$pw" ]];
     then
-        log_Message "ERROR: Argument not provided"
+        log_Message "Argument not provided" "ERROR"
         exit 1
     fi
 
@@ -106,25 +110,25 @@ function main() {
         log_Message "Application present: ${cortexApplicationPath}"
         if [[ ! -f "$cortexUninstallerTool" ]] && [[ ! -f "$trapsUninstallerTool" ]];
         then
-            log_Message "ERROR: Unable to locate \"${cortexUninstallerTool}\" or \"${trapsUninstallerTool}\""
+            log_Message "Unable to locate \"${cortexUninstallerTool}\" or \"${trapsUninstallerTool}\"" "ERROR"
             exit 1
         fi
 
         if [[ ! -d "$cortexLibraryPath" ]];
         then
-            log_Message "ERROR: Unable to locate: \"${cortexLibraryPath}\""
+            log_Message "Unable to locate: \"${cortexLibraryPath}\"" "ERROR"
             exit 1
         fi
 
         if ! check_Uninstall "$cortexUninstallerTool" "$appName";
         then
-            log_Message "ERROR: Exiting at ${appName} uninstall"
+            log_Message "Exiting at ${appName} uninstall" "ERROR"
             exit 1
         fi
 
         if ! check_Uninstall "$trapsUninstallerTool" "$oldAppName";
         then
-            log_Message "ERROR: Exiting at ${oldAppName} uninstall"
+            log_Message "Exiting at ${oldAppName} uninstall" "ERROR"
             exit 1
         fi
 
@@ -144,8 +148,14 @@ function main() {
     then
         log_Message "Successfully installed: ${appNameVersion}"
     else
-        log_Message "ERROR: Unable to install: ${appNameVersion}"
-        exit 1
+        log_Message "Unable to install: ${appNameVersion}" "ERROR"
+        if /usr/local/bin/jamf policy -event "$jamfFallbackInstall" &>/dev/null;
+        then
+            log_Message "Successfully installed: ${appNameFallbackVersion}"
+        else
+            log_Message "Unable to install: ${appNameFallbackVersion}" "ERROR"
+            exit 1
+        fi
     fi
 
     sleep $installWait
@@ -154,7 +164,7 @@ function main() {
     then
         log_Message "Application present: ${cortexApplicationPath}"
     else
-        log_Message "Unable to locate: ${cortexApplicationPath}"
+        log_Message "Unable to locate: ${cortexApplicationPath}" "ERROR"
         exit 1
     fi
 
