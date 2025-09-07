@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 08-11-25  ###
-### Version: 3.3       ###
+### Updated: 09-06-25  ###
+### Version: 3.4       ###
 ##########################
 
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
@@ -14,8 +14,10 @@ readonly maxAttempts=10
 
 # Append current status to log file
 function log_Message() {
+    local message="$1"
+    local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logPath"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
 }
 
 # Attempt to handle a jamf policy already being run
@@ -64,34 +66,34 @@ function check_Name() {
 function main() {
     /usr/bin/caffeinate -d &
     CAFFEINATE_PID=$!
-    trap "kill $CAFFEINATE_PID" EXIT INT TERM
+    trap "kill $CAFFEINATE_PID" EXIT INT TERM HUP
     printf "Log: $(date "+%F %T") Beginning Update Inventory script\n" | tee "$logPath"
 
-    log_Message "Checking for lingering enrollment policies"
+    log_Message "Checking for enrollment policies"
     enrollmentCheckResult=$(/usr/local/bin/jamf policy -event enrollmentComplete)
     if ! check_PolicyStatus "$enrollmentCheckResult" "enrollmentComplete";
     then
-        log_Message "Checked $maxAttempts times, giving up"
+        log_Message "Checked $maxAttempts times, continuing"
     else
         log_Message "Enrollment policy check complete"
     fi
 
     sleep 1
 
-    log_Message "Checking for policies with Jamf Policy"
+    log_Message "Checking for policies"
     policyCheckResult=$(/usr/local/bin/jamf policy)
     if ! check_PolicyStatus "$policyCheckResult";
     then
-        log_Message "Checked $maxAttempts times, giving up"
+        log_Message "Checked $maxAttempts times, continuing"
     else
-        log_Message "Standard policy check complete"
+        log_Message "Policy check complete"
     fi
 
     sleep 1
 
     log_Message "Updating inventory with Jamf Recon"
     /usr/local/bin/jamf recon 1>/dev/null
-    log_Message "Inventory update complete"
+    log_Message "Inventory update finished"
 
     if [[ $(/usr/bin/uname -p) = 'arm' ]];
     then
@@ -133,7 +135,13 @@ function main() {
     if [[ ! -d "$jamfConnectApp" ]] || [[ ! -f "$jamfConnectPLIST" ]];
     then
         log_Message "Missing Jamf Connect, attempting install"
-        /usr/local/bin/jamf policy -event MissingJamfConnect
+        if /usr/local/bin/jamf policy -event MissingJamfConnect;
+        then
+            log_Message "Jamf Connect policy finished"
+        else
+            log_Message "Unable to complete Jamf Connect policy" "ERROR"
+            /usr/bin/osascript -e 'display alert "An error has occurred!" message "You must install Jamf Connect to authenticate properly at login" as critical'
+        fi
     else
         log_Message "Jamf Connect already installed"
     fi
