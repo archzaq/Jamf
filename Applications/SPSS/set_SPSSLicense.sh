@@ -21,7 +21,14 @@ function log_Message() {
     local message="$1"
     local type="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
+    local formattedMessage
+    formattedMessage=$(printf "%s: %s %s\n" "$type" "$timestamp" "$message")
+    if [[ -w "$logFile" ]];
+    then
+        printf "%s" "$formattedMessage" | tee -a "$logFile"
+    else
+        printf "%s" "$formattedMessage"
+    fi
 }
 
 function check_SPSSInstalled() {
@@ -83,7 +90,7 @@ function clean_Env() {
         log_Message "SPSS still named improperly, renaming back to original name" "WARN"
         if ! rename_SPSSApplication "$SPSSAppPathTemp" "$SPSSAppPath";
         then
-            log_Message "Unable to rename SPSS from ${SPSSAppPathTemp} to ${SPSSAppPath}"
+            log_Message "Unable to rename SPSS from ${SPSSAppPathTemp} to ${SPSSAppPath}" "ERROR"
         fi
     elif [[ -d "$SPSSAppPath" ]];
     then
