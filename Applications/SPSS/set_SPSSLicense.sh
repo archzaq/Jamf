@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-10-25  ###
-### Updated: 09-11-25  ###
-### Version: 1.0       ###
+### Updated: 09-12-25  ###
+### Version: 1.1       ###
 ##########################
 
 readonly licenseServer="$4"
