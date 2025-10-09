@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
-### Updated: 10-08-25  ###
-### Version: 0.2       ###
+### Updated: 10-09-25  ###
+### Version: 0.3       ###
 ##########################
 
 readonly currentUser="$(whoami)"
@@ -14,6 +14,7 @@ readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
 readonly anacondaLink='https://repo.anaconda.com/archive/Anaconda3-2025.06-0-Linux-x86_64.sh'
 readonly anacondaInstallerName='Anaconda3-2025.06-0-Linux-x86_64.sh'
+readonly anacondaInstallPath="${currentUserHomePath}/anaconda3"
 
 ### HPC Module Names ###
 readonly condaModule="Anaconda3"
@@ -36,7 +37,7 @@ function log_Message() {
 function create_InstallDir() {
     if [[ ! -d "$quantumGRNInstallPath" ]];
     then
-        if mkdir "$quantumGRNInstallPath";
+        if mkdir -p "$quantumGRNInstallPath";
         then
             if [[ -d "$quantumGRNInstallPath" ]];
             then
@@ -81,6 +82,22 @@ function load_Module() {
     fi
 }
 
+# Check for shell env file then source it
+function source_ShellEnv() {
+    local shellFilesArray=(".bashrc" ".zshrc" ".bash_profile")
+    for file in "${shellFilesArray[@]}";
+    do
+        if [[ -f "${currentUserHomePath}/${file}" ]];
+        then
+            source "${currentUserHomePath}/${file}" 2>/dev/null
+            log_Message "Sourced ${file}"
+            return 0
+        fi
+    done
+    log_Message "Unable to find shell source file"
+    return 1
+}
+
 function main() {
     printf "Log: $(date "+%F %T") Beginning HPC QuantumGRN Install script\n" | tee "$logFile"
 
@@ -91,7 +108,24 @@ function main() {
         exit 1
     fi
 
-    load_Module "$condaModule"
+    if ! load_Module "$condaModule";
+    then
+        log_Message "Attempting to install Anaconda3"
+        if curl -L "$anacondaLink" -o "$quantumGRNInstallPath/$anacondaInstallerName";
+        then
+            log_Message "Anaconda3 installer script downloaded"
+            bash "$quantumGRNInstallPath/${anacondaInstallerName}"
+        else
+            log_Message "Unable to download Anaconda3 installer script" "ERROR"
+            exit 1
+        fi
+
+        if ! source_ShellEnv;
+        then
+            log_Message "Unable to source shell env"
+        fi
+        eval "$(${anacondaInstallPath}/bin/conda shell.bash hook)"
+    fi
 
     # Check for conda
     log_Message "Checking for conda command"
@@ -100,24 +134,10 @@ function main() {
         log_Message "Conda available"
     else
         log_Message "Conda not available" "ERROR"
-        if curl -O "$anacondaLink";
-        then
-            log_Message "Anaconda3 installer script downloaded"
-            bash "~/${anacondaInstallerName}"
-        else
-            log_Message "Unable to download Anaconda3 installer script" "ERROR"
-            exit 1
-        fi
+        exit 1
     fi
 
-    # Initialize conda for bash if needed
-    if ! conda info &>/dev/null;
-    then
-        log_Message "Initializing conda for current shell"
-        eval "$(conda shell.bash hook)" 2>/dev/null || true
-    fi
-
-    # Make the necessary conda env
+   # Make the necessary conda env
     log_Message "Checking for myqgrn conda env"
     if conda info --envs | grep -q "myqgrn";
     then
@@ -158,14 +178,15 @@ function main() {
     fi
 
     # Try to load git module
-    load_Module "$gitModule"
-
-    # Check for git
-    log_Message "Checking for git command"
-    if ! command -v git &>/dev/null;
+    if ! load_Module "$gitModule";
     then
-        log_Message "Git not available" "ERROR"
-        exit 1
+        if sudo dnf install -y git;
+        then
+            log_Message "Installed git"
+        else
+            log_Message "Unable to install git"
+            exit 1
+        fi
     fi
 
     # Clone QuantumGRN repo for test example
