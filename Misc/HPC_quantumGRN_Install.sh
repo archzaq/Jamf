@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
 ### Updated: 10-09-25  ###
-### Version: 0.3       ###
+### Version: 0.4       ###
 ##########################
 
 readonly currentUser="$(whoami)"
@@ -101,7 +101,6 @@ function source_ShellEnv() {
 function main() {
     printf "Log: $(date "+%F %T") Beginning HPC QuantumGRN Install script\n" | tee "$logFile"
 
-    # Create install folder
     if ! create_InstallDir;
     then
         log_Message "Exiting at QuantumGRN folder creation" "ERROR"
@@ -127,7 +126,6 @@ function main() {
         eval "$(${anacondaInstallPath}/bin/conda shell.bash hook)"
     fi
 
-    # Check for conda
     log_Message "Checking for conda command"
     if command -v conda &>/dev/null;
     then
@@ -137,7 +135,6 @@ function main() {
         exit 1
     fi
 
-   # Make the necessary conda env
     log_Message "Checking for myqgrn conda env"
     if conda info --envs | grep -q "myqgrn";
     then
@@ -153,7 +150,6 @@ function main() {
         fi
     fi
 
-    # Install system dependencies via conda
     log_Message "Installing cairo and build dependencies via conda"
     if conda install -n myqgrn -c conda-forge cairo pkg-config gcc_linux-64 gxx_linux-64 make -y;
     then
@@ -167,7 +163,6 @@ function main() {
     #sudo dnf install -y cairo-devel pkg-config
     #sudo dnf groupinstall -y 'Development Tools'
 
-    # Install QuantumGRN
     log_Message "Installing QuantumGRN to myqgrn conda env"
     if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN";
     then
@@ -177,7 +172,6 @@ function main() {
         exit 1
     fi
 
-    # Try to load git module
     if ! load_Module "$gitModule";
     then
         if sudo dnf install -y git;
@@ -189,33 +183,31 @@ function main() {
         fi
     fi
 
-    # Clone QuantumGRN repo for test example
     log_Message "Cloning QuantumGRN repo for example script"
     if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
     then
         log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
-    else
-        log_Message "Unable to clone QuantumGRN repo: https://github.com/cailab-tamu/QuantumGRN" "ERROR"
-        exit 1
-    fi
-
-    if [[ -d "$quantumGRNTestScriptLocation" ]];
-    then
-        if cd "$quantumGRNTestScriptLocation";
+        if [[ -d "$quantumGRNTestScriptLocation" ]];
         then
-            if conda run -n myqgrn python 02_test.py;
+            if cd "$quantumGRNTestScriptLocation";
             then
-                log_Message "Test ran successfully!"
+                if conda run -n myqgrn python 02_example.py;
+                then
+                    log_Message "Test ran successfully!"
+                else
+                    log_Message "Issue with QuantumGRN test" "ERROR"
+                    exit 1
+                fi
             else
-                log_Message "Issue with QuantumGRN test" "ERROR"
+                log_Message "Unable to cd to $quantumGRNTestScriptLocation" "ERROR"
                 exit 1
             fi
         else
-            log_Message "Unable to cd to $quantumGRNTestScriptLocation" "ERROR"
-            exit 1
+            log_Message "Unable to locate test directory at $quantumGRNTestScriptLocation" "WARN"
         fi
     else
-        log_Message "Unable to locate test directory at $quantumGRNTestScriptLocation" "WARN"
+        log_Message "Unable to clone QuantumGRN repo: https://github.com/cailab-tamu/QuantumGRN" "ERROR"
+        exit 1
     fi
 
     log_Message "Exiting!"
