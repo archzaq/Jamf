@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
 ### Updated: 10-08-25  ###
-### Version: 0.1       ###
+### Version: 0.2       ###
 ##########################
 
 readonly currentUser="$(whoami)"
@@ -12,6 +12,8 @@ readonly currentUserHomePath="/home/${currentUser}"
 readonly quantumGRNInstallPath="${currentUserHomePath}/quantumInstallation"
 readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
+readonly anacondaLink='https://repo.anaconda.com/archive/Anaconda3-2025.06-0-Linux-x86_64.sh'
+readonly anacondaInstallerName='Anaconda3-2025.06-0-Linux-x86_64.sh'
 
 ### HPC Module Names ###
 readonly condaModule="Anaconda3"
@@ -98,7 +100,14 @@ function main() {
         log_Message "Conda available"
     else
         log_Message "Conda not available" "ERROR"
-        exit 1
+        if curl -O "$anacondaLink";
+        then
+            log_Message "Anaconda3 installer script downloaded"
+            bash "~/${anacondaInstallerName}"
+        else
+            log_Message "Unable to download Anaconda3 installer script" "ERROR"
+            exit 1
+        fi
     fi
 
     # Initialize conda for bash if needed
