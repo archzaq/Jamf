@@ -17,7 +17,7 @@ readonly anacondaInstallerName='Anaconda3-2025.06-0-Linux-x86_64.sh'
 readonly anacondaInstallPath="${currentUserHomePath}/anaconda3"
 
 ### HPC Module Names ###
-readonly condaModule='anaconda'
+readonly condaModule='anaconda/3'
 
 # Append current status to log file
 function log_Message() {
