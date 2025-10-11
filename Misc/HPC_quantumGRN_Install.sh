@@ -151,12 +151,12 @@ function main() {
             then
                 eval "$(conda shell.bash hook)" 2>/dev/null
                 log_Message "Conda initialized successfully after sourcing shell files"
-            else
-                log_Message "Unable to locate conda command" "ERROR"
-                exit 1
             fi
-        else
-            log_Message "Unable to locate conda command" "ERROR"
+        fi
+
+        if ! command -v conda &>/dev/null;
+        then
+            log_Message "Unable to locate conda" "ERROR"
             exit 1
         fi
     fi
