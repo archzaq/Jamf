@@ -3,14 +3,15 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
-### Updated: 10-10-25  ###
-### Version: 1.3       ###
+### Updated: 10-11-25  ###
+### Version: 1.4       ###
 ##########################
 
 readonly currentUser="${USER:-$(whoami)}"
 readonly currentUserHomePath="${HOME:-/home/${currentUser}}"
 readonly quantumGRNInstallPath="${PROJECTS:-${currentUserHomePath}}/quantumInstallation"
-readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
+readonly quantumGRNClonePath="${quantumGRNInstallPath}/QuantumGRN"
+readonly quantumGRNTestScriptLocation="${quantumGRNClonePath}/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
 readonly condaModule='anaconda/3'
 
@@ -94,12 +95,8 @@ function ask_Continue() {
 
 # Check for sudo privileges
 function check_Sudo() {
-    if ! groups | grep -qE '\b(wheel|sudo|root)\b';
-    then
-        log_Message "Unable to elevate"
-        return 1
-    fi
-    return 0
+    groups | grep -qE '\b(wheel|sudo|root)\b';
+    return $?
 }
 
 # Check for shell env file then source it
@@ -227,17 +224,17 @@ function main() {
 
     if command -v git &>/dev/null;
     then
-        if [[ -d "${quantumGRNInstallPath}/QuantumGRN" ]];
+        if [[ -d "${quantumGRNClonePath}" ]];
         then
             log_Message "QuantumGRN repository already exists"
-            log_Message "To update the repo, delete ${quantumGRNInstallPath}/QuantumGRN and run the script again"
+            log_Message "To update the repo, delete ${quantumGRNClonePath} and run the script again"
         else
             if ask_Continue "Would you like to clone the QuantumGRN repo?";
             then
                 log_Message "Cloning QuantumGRN repo"
-                if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN" 2>&1 | tee -a "$logFile";
+                if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNClonePath}" 2>&1 | tee -a "$logFile";
                 then
-                    log_Message "QuantumGRN repo cloned to: ${quantumGRNInstallPath}/QuantumGRN"
+                    log_Message "QuantumGRN repo cloned to: ${quantumGRNClonePath}"
                 else
                     log_Message "Unable to clone QuantumGRN repo" "WARN"
                     log_Message "Try to manually clone from: https://github.com/cailab-tamu/QuantumGRN"
