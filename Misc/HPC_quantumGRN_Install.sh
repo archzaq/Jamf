@@ -7,8 +7,8 @@
 ### Version: 1.2       ###
 ##########################
 
-readonly currentUser="$(whoami)"
-readonly currentUserHomePath="/home/${currentUser}"
+readonly currentUser="${USER:-$(whoami)}"
+readonly currentUserHomePath="${HOME:-/home/${currentUser}}"
 readonly quantumGRNInstallPath="${PROJECTS:-${currentUserHomePath}}/quantumInstallation"
 readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
