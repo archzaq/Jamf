@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
 ### Updated: 10-10-25  ###
-### Version: 1.1       ###
+### Version: 1.2       ###
 ##########################
 
 readonly currentUser="$(whoami)"
@@ -12,8 +12,6 @@ readonly currentUserHomePath="/home/${currentUser}"
 readonly quantumGRNInstallPath="${PROJECTS:-${currentUserHomePath}}/quantumInstallation"
 readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
-
-### HPC Module Names ###
 readonly condaModule='anaconda/3'
 
 # Append current status to log file
@@ -94,6 +92,7 @@ function ask_Continue() {
     esac
 }
 
+# Check for sudo privileges
 function check_Sudo() {
     if ! groups | grep -qE '\b(wheel|sudo|root)\b';
     then
@@ -187,7 +186,7 @@ function main() {
     fi
 
     # Fix dependencies Alma/Redhat
-    #sudo dnf install -y cairo-devel pkg-config sudo dnf groupinstall -y 'Development Tools'
+    #sudo dnf install -y cairo-devel pkg-config && sudo dnf groupinstall -y 'Development Tools'
 
     log_Message "Installing QuantumGRN to myqgrn conda env"
     if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN" 2>&1 | tee -a "$logFile";
@@ -275,13 +274,17 @@ function main() {
     else
         log_Message "Git not available, skipping repo clone and test" "WARN"
     fi
+
     log_Message "QuantumGRN installation completed successfully!"
     log_Message "To use QuantumGRN:"
-    log_Message "    Run: conda activate myqgrn"
-    log_Message "    Import QuantumGRN in your Python scripts"
+    log_Message "    conda activate myqgrn"
+    log_Message ""
+    log_Message "Import qscgrn in Python:"
+    log_Message "    from qscgrn import *"
     log_Message ""
     log_Message "Installation location: $quantumGRNInstallPath"
     log_Message "Log file: $logFile"
+
     exit 0
 }
 
