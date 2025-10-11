@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
 ### Updated: 10-10-25  ###
-### Version: 1.2       ###
+### Version: 1.3       ###
 ##########################
 
 readonly currentUser="${USER:-$(whoami)}"
@@ -202,9 +202,9 @@ function main() {
         log_Message "Unable to locate git" "WARN"
         if check_Sudo;
         then
-            if ask_Continue "Would you like to install git using DNF?";
+            if command -v dnf &>/dev/null;
             then
-                if command -v dnf &>/dev/null;
+                if ask_Continue "Would you like to install git using DNF?";
                 then
                     if sudo dnf install -y git 2>&1 | tee -a "$logFile";
                     then
@@ -213,10 +213,10 @@ function main() {
                         log_Message "Unable to install git" "WARN"
                     fi
                 else
-                    log_Message "Unable to locate DNF" "WARN"
+                    log_Message "Skipping git install" "WARN"
                 fi
             else
-                log_Message "Skipping git install" "WARN"
+                log_Message "Unable to locate DNF for git install" "WARN"
             fi
         else
             log_Message "Unable to install git" "WARN"
