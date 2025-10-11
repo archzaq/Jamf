@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 09-29-25  ###
 ### Updated: 10-10-25  ###
-### Version: 1.0       ###
+### Version: 1.1       ###
 ##########################
 
 readonly currentUser="$(whoami)"
@@ -12,9 +12,6 @@ readonly currentUserHomePath="/home/${currentUser}"
 readonly quantumGRNInstallPath="${PROJECTS:-${currentUserHomePath}}/quantumInstallation"
 readonly quantumGRNTestScriptLocation="${quantumGRNInstallPath}/QuantumGRN/test"
 readonly logFile="${currentUserHomePath}/HPC_quantumGRN_Install.log"
-readonly anacondaLink='https://repo.anaconda.com/archive/Anaconda3-2025.06-0-Linux-x86_64.sh'
-readonly anacondaInstallerName='Anaconda3-2025.06-0-Linux-x86_64.sh'
-readonly anacondaInstallPath="${currentUserHomePath}/anaconda3"
 
 ### HPC Module Names ###
 readonly condaModule='anaconda/3'
@@ -60,10 +57,10 @@ function load_Module() {
     local name="$1"
     if command -v module &>/dev/null;
     then
-        if module avail "$name" 2>&1 | grep -q "$name";
+        if module avail "$name" 2>&1 | tee -a "$logFile" | grep -q "$name";
         then
             log_Message "Loading module: $name"
-            if module load "$name" 2>&1;
+            if module load "$name" 2>&1 | tee -a "$logFile";
             then
                 log_Message "Module $name loaded successfully"
                 return 0
@@ -83,7 +80,8 @@ function load_Module() {
 
 # Ask to confirm before continuing
 function ask_Continue() {
-    read -p 'Would you like to continue? (Y/N): ' answer
+    local prompt="${1:-Would you like to continue?}"
+    read -p "${prompt} (Y/N) " answer
     case "$answer" in
         [Yy]|[Yy][Ee][Ss])
             log_Message "User chose to continue"
@@ -96,15 +94,10 @@ function ask_Continue() {
     esac
 }
 
-# Without HPC modules, install anaconda
-function linux_InstallAnaconda() {
-    log_Message "Attempting to install Anaconda3"
-    if curl -L "$anacondaLink" -o "$quantumGRNInstallPath/$anacondaInstallerName";
+function check_Sudo() {
+    if ! groups | grep -qE '\b(wheel|sudo|root)\b';
     then
-        log_Message "Anaconda3 installer script downloaded"
-        bash "$quantumGRNInstallPath/${anacondaInstallerName}"
-    else
-        log_Message "Unable to download Anaconda3 installer script" "ERROR"
+        log_Message "Unable to elevate"
         return 1
     fi
     return 0
@@ -112,7 +105,7 @@ function linux_InstallAnaconda() {
 
 # Check for shell env file then source it
 function source_ShellEnv() {
-    local shellFilesArray=(".bashrc" ".zshrc" ".bash_profile")
+    local shellFilesArray=(".bashrc" ".zshrc" ".profile" ".bash_profile")
     for file in "${shellFilesArray[@]}";
     do
         if [[ -f "${currentUserHomePath}/${file}" ]];
@@ -138,58 +131,44 @@ function main() {
     if ! load_Module "$condaModule";
     then
         log_Message "Unable to load conda module" "WARN"
-        log_Message "Would you like to install Linux Anaconda3?"
-        if ask_Continue;
+        if ! source_ShellEnv;
         then
-            if ! linux_InstallAnaconda;
-            then
-                log_Message "Anaconda installation failed" "ERROR"
-                exit 1
-            fi
-
-            if ! source_ShellEnv;
-            then
-                log_Message "Unable to source shell env"
-            fi
-
-            eval "$(${anacondaInstallPath}/bin/conda shell.bash hook)"
+            log_Message "Unable to source shell env"
         fi
     fi
 
     if command -v conda &>/dev/null;
     then
-        eval "$(conda shell.bash hook)"
-        log_Message "Conda initialized"
+        eval "$(conda shell.bash hook)" 2>/dev/null
+        log_Message "Conda initialized successfully"
+        log_Message "Conda location: $(which conda)"
     else
-        log_Message "Unable to initialize conda" "WARN"
-        log_Message "Would you like to try a manual conda initialization?"
-        if ask_Continue;
+        log_Message "Unable to initialize conda after loading module" "WARN"
+        log_Message "Attempting to source shell environment files"
+        
+        if source_ShellEnv;
         then
-            log_Message "Attempting manual conda initialization"
-            if [[ -f "${anacondaInstallPath}/etc/profile.d/conda.sh" ]];
+            if command -v conda &>/dev/null;
             then
-                source "${anacondaInstallPath}/etc/profile.d/conda.sh"
-            fi
-
-            if ! command -v conda &>/dev/null;
-            then
-                log_Message "Unable to locate conda" "ERROR"
+                eval "$(conda shell.bash hook)" 2>/dev/null
+                log_Message "Conda initialized successfully after sourcing shell files"
+            else
+                log_Message "Unable to locate conda command" "ERROR"
                 exit 1
             fi
         else
-            log_Message "Skipping manual conda initialization" "WARN"
-            log_Message "Unable to continue without conda" "ERROR"
+            log_Message "Unable to locate conda command" "ERROR"
             exit 1
         fi
     fi
 
     log_Message "Checking for myqgrn conda env"
-    if conda info --envs | grep -q "myqgrn";
+    if conda info --envs 2>&1 | tee -a "$logFile" | grep -q "myqgrn";
     then
         log_Message "Environment myqgrn already exists"
     else
         log_Message "Creating conda environment myqgrn"
-        if conda create -n myqgrn python=3.9 -y;
+        if conda create -n myqgrn python=3.9 -y 2>&1 | tee -a "$logFile";
         then
             log_Message "myqgrn conda env created"
         else
@@ -199,7 +178,7 @@ function main() {
     fi
 
     log_Message "Installing cairo and build dependencies via conda"
-    if conda install -n myqgrn -c conda-forge cairo pkg-config gcc_linux-64 gxx_linux-64 make -y;
+    if conda install -n myqgrn -c conda-forge cairo pkg-config gcc_linux-64 gxx_linux-64 make -y 2>&1 | tee -a "$logFile";
     then
         log_Message "Installed cairo, pkg-config, and build tools via conda"
     else
@@ -207,12 +186,11 @@ function main() {
         exit 1
     fi
 
-    # Fix dependencies
-    #sudo dnf install -y cairo-devel pkg-config
-    #sudo dnf groupinstall -y 'Development Tools'
+    # Fix dependencies Alma/Redhat
+    #sudo dnf install -y cairo-devel pkg-config sudo dnf groupinstall -y 'Development Tools'
 
     log_Message "Installing QuantumGRN to myqgrn conda env"
-    if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN";
+    if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN" 2>&1 | tee -a "$logFile";
     then
         log_Message "QuantumGRN successfully installed using pip"
     else
@@ -223,22 +201,26 @@ function main() {
     if ! command -v git &>/dev/null;
     then
         log_Message "Unable to locate git" "WARN"
-        log_Message "Would you like to install git using DNF? Requires sudo access"
-        if ask_Continue;
+        if check_Sudo;
         then
-            if command -v dnf &>/dev/null;
+            if ask_Continue "Would you like to install git using DNF?";
             then
-                if sudo dnf install -y git;
+                if command -v dnf &>/dev/null;
                 then
-                    log_Message "Installed git"
+                    if sudo dnf install -y git 2>&1 | tee -a "$logFile";
+                    then
+                        log_Message "Installed git"
+                    else
+                        log_Message "Unable to install git" "WARN"
+                    fi
                 else
-                    log_Message "Unable to install git" "WARN"
+                    log_Message "Unable to locate DNF" "WARN"
                 fi
             else
-                log_Message "Unable to locate DNF" "WARN"
+                log_Message "Skipping git install" "WARN"
             fi
         else
-            log_Message "Skipping git install" "WARN"
+            log_Message "Unable to install git" "WARN"
         fi
     else
         log_Message "Git already available"
@@ -246,47 +228,56 @@ function main() {
 
     if command -v git &>/dev/null;
     then
-        if [[ ! -d "${quantumGRNInstallPath}/QuantumGRN" ]];
+        if [[ -d "${quantumGRNInstallPath}/QuantumGRN" ]];
         then
-            log_Message "Would you like to clone QuantumGRN repo for test script?"
-            if ask_Continue;
+            log_Message "QuantumGRN repository already exists"
+            log_Message "To update the repo, delete ${quantumGRNInstallPath}/QuantumGRN and run the script again"
+        else
+            if ask_Continue "Would you like to clone the QuantumGRN repo?";
             then
-                log_Message "Cloning QuantumGRN repo for example script"
-                if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
+                log_Message "Cloning QuantumGRN repo"
+                if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN" 2>&1 | tee -a "$logFile";
                 then
-                    log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
-                    if [[ -d "$quantumGRNTestScriptLocation" ]];
-                    then
-                        if cd "$quantumGRNTestScriptLocation";
-                        then
-                            if conda run -n myqgrn python 02_example.py;
-                            then
-                                log_Message "Test ran successfully!"
-                            else
-                                log_Message "Issue with QuantumGRN test" "WARN"
-                            fi
-                        else
-                            log_Message "Unable to cd to $quantumGRNTestScriptLocation" "WARN"
-                        fi
-                    else
-                        log_Message "Unable to locate test directory at $quantumGRNTestScriptLocation" "WARN"
-                    fi
+                    log_Message "QuantumGRN repo cloned to: ${quantumGRNInstallPath}/QuantumGRN"
                 else
-                    log_Message "Unable to clone QuantumGRN repo: https://github.com/cailab-tamu/QuantumGRN" "WARN"
+                    log_Message "Unable to clone QuantumGRN repo" "WARN"
+                    log_Message "Try to manually clone from: https://github.com/cailab-tamu/QuantumGRN"
                 fi
             else
-                log_Message "Skipping QuantumGRN repo cloning"
+                log_Message "Skipping repository clone"
+            fi
+        fi
+
+        if [[ -d "$quantumGRNTestScriptLocation" ]];
+        then
+            if ask_Continue "Would you like to run the test script (02_example.py)?";
+            then
+                log_Message "Running test script"
+                if cd "$quantumGRNTestScriptLocation";
+                then
+                    if conda run -n myqgrn python 02_example.py 2>&1 | tee -a "$logFile";
+                    then
+                        log_Message "Test script ran successfully!"
+                    else
+                        log_Message "Test script encountered an error" "WARN"
+                        log_Message "This may be expected if test data files are missing" "WARN"
+                        log_Message "QuantumGRN installation is still complete"
+                    fi
+                else
+                    log_Message "Unable to change to test directory: $quantumGRNTestScriptLocation" "WARN"
+                fi
+            else
+                log_Message "Skipping test script execution"
             fi
         else
-            log_Message "QuantumGRN repo already cloned"
+            log_Message "Test directory not found" "WARN"
         fi
     else
-        log_Message "Git not found" "WARN"
+        log_Message "Git not available, skipping repo clone and test" "WARN"
     fi
-
     log_Message "QuantumGRN installation completed successfully!"
     log_Message "To use QuantumGRN:"
-    log_Message "    Activate the environment: conda activate myqgrn"
+    log_Message "    Run: conda activate myqgrn"
     log_Message "    Import QuantumGRN in your Python scripts"
     log_Message ""
     log_Message "Installation location: $quantumGRNInstallPath"
