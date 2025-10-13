@@ -135,7 +135,7 @@ function main() {
 
     if command -v conda &>/dev/null;
     then
-        eval "$(conda shell.bash hook)" 2>/dev/null
+        eval "$(conda shell.bash hook)"
         log_Message "Conda initialized successfully"
         log_Message "Conda location: $(which conda)"
     else
