@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-10-25  ###
-### Updated: 10-24-25  ###
-### Version: 2.0       ###
+### Updated: 10-25-25  ###
+### Version: 2.1       ###
 ##########################
 
 readonly licenseServer="$4"
@@ -21,13 +21,11 @@ function log_Message() {
     local message="$1"
     local type="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    local formattedMessage
-    formattedMessage=$(printf "%s: %s %s\n" "$type" "$timestamp" "$message")
     if [[ -w "$logFile" ]];
     then
-        printf "%s" "$formattedMessage" | tee -a "$logFile"
+        printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
     else
-        printf "%s" "$formattedMessage"
+        printf "%s: %s %s\n" "$type" "$timestamp" "$message"
     fi
 }
 
