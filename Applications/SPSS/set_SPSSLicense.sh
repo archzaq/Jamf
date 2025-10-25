@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-10-25  ###
-### Updated: 09-12-25  ###
-### Version: 1.1       ###
+### Updated: 10-24-25  ###
+### Version: 2.0       ###
 ##########################
 
 readonly licenseServer="$4"
@@ -49,9 +49,23 @@ function check_SPSSInstalled() {
 function rename_SPSSApplication() {
     local start="$1"
     local end="$2"
+    if [[ -e "$end" ]];
+    then
+        log_Message "${end} already exists, removing it" "WARN"
+        if ! rm -rf "$end";
+        then
+            log_Message "Unable to remove existing files at ${end}"
+        fi
+    fi
+
     if mv "$start" "$end";
     then
         log_Message "SPSS renamed from ${start} to ${end}"
+
+        # Force Launch Services to update its database
+        /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$end"
+        
+        sleep 2
     else
         log_Message "Unable to rename SPSS from ${start} to ${end}" "WARN"
         return 1
@@ -84,6 +98,29 @@ function change_LicenseServer() {
     return 1
 }
 
+function run_LicenseActivator() {
+    local output
+    local exitCode
+    log_Message "Running license activator"
+
+    cd "$SPSSActivationPath" || {
+        log_Message "Unable to change to activation directory" "ERROR"
+        return 1
+    }
+
+    if output=$("$licenseActivator" -f "$activationProperties" 2>&1);
+    then
+        log_Message "License server set for SPSS using license activator"
+        log_Message "Activator output: ${output}"
+        return 0
+    else
+        exitCode=$?
+        log_Message "License activator failed with code: ${exitCode}" "ERROR"
+        log_Message "Activator error output: ${output}"
+        return 1
+    fi
+}
+
 function clean_Env() {
     if [[ -d "$SPSSAppPathTemp" ]];
     then
@@ -110,6 +147,13 @@ function main() {
         exit 1
     fi
 
+    if pgrep -f "IBM SPSS Statistics" > /dev/null;
+    then
+        log_Message "Killing SPSS" "WARN"
+        killall "IBM SPSS Statistics" 2>/dev/null
+        sleep 3
+    fi
+
     if ! check_SPSSInstalled;
     then
         log_Message "Exiting at SPSS Application check" "ERROR"
@@ -118,9 +162,11 @@ function main() {
 
     if ! rename_SPSSApplication "$SPSSAppPath" "$SPSSAppPathTemp";
     then
-        log_Message "Exiting at SPSS rename" "ERROR"
+        log_Message "Exiting at rename SPSS" "ERROR"
         exit 1
     fi
+
+    sleep 1
 
     if ! change_LicenseServer;
     then
@@ -128,13 +174,15 @@ function main() {
         exit 1
     fi
 
-    if "$licenseActivator" -f "$activationProperties";
+    sleep 1
+
+    if ! run_LicenseActivator;
     then
-        log_Message "License server set for SPSS using license activator"
-    else
-        log_Message "Unable to set license server" "ERROR"
+        log_Message "Exiting at run license activator" "ERROR"
         exit 1
     fi
+
+    sleep 1
 
     if ! rename_SPSSApplication "$SPSSAppPathTemp" "$SPSSAppPath";
     then
