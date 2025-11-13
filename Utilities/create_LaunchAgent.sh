@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 09-02-25  ###
-### Updated: 09-03-25  ###
-### Version: 1.0       ###
+### Updated: 11-13-25  ###
+### Version: 1.1       ###
 ##########################
 
 readonly logFile='/var/log/create_LaunchAgent.log'
@@ -72,7 +72,7 @@ function main() {
         exit 1
     fi
 
-    if /usr/bin/defaults write "$agentPath" ProgramArguments -array-add "$programArgument1" "$programArgument2";
+    if /usr/bin/defaults write "$agentPath" ProgramArguments -array "$programArgument1" "$programArgument2";
     then
         log_Message "Successfully set LaunchAgent ProgramArguments"
     else
