@@ -88,6 +88,14 @@ function main() {
         exit 1
     fi
 
+    ### Optional: Start at 9am ###
+    if /usr/bin/defaults write "$agentPath" StartCalendarInterval -dict Hour 9 Minute 0;
+    then
+        log_Message "Successfully set LaunchAgent StartCalendarInterval"
+    else
+        log_Message "Unable to set LaunchAgent StartCalendarInterval" "WARN"
+    fi
+
     if /usr/bin/plutil -convert xml1 "$agentPath" &>/dev/null;
     then
         log_Message "LaunchAgent plist set to XML"
