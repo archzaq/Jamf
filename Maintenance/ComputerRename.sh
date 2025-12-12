@@ -12,7 +12,7 @@ readonly currentHostName=$(/usr/sbin/scutil --get HostName)
 readonly currentComputerName=$(/usr/sbin/scutil --get ComputerName)
 readonly computerSerial=$(ioreg -l | grep IOPlatformSerialNumber | sed 's/"$//' | sed 's/.*"//')
 readonly serialShort=${computerSerial: -6}
-readonly logPath='/var/log/computerRename_Background.log'
+readonly logFile='/var/log/computerRename_Background.log'
 standardName="SLU-$serialShort"
 
 # Append current status to log file
