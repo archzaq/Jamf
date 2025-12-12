@@ -19,6 +19,7 @@ readonly jamfConnectFilesArray=(
     "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent.pkg" 
     "/Library/Application Support/JAMF/Receipts/JamfConnectLaunchAgent2.pkg"
     "/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle"
+    "/Library/Application Support/JamfConnect"
     "/Applications/Jamf Connect.app"
 )
 
@@ -52,6 +53,8 @@ function main(){
         then
             log_Message "Removing $jamfConnectFile"
             rm -r "$jamfConnectFile"
+        else
+            log_Message "Skipping $jamfConnectFile"
         fi
     done
 
