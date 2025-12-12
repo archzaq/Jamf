@@ -25,11 +25,24 @@ readonly jamfConnectFilesArray=(
 
 # Append current status to log file
 function log_Message() {
-    echo "Log: $(date "+%F %T") $1" | tee -a "$logPath"
+	local message="$1"
+	local type="${2:-Log}"
+	local timestamp="$(date "+%F %T")"
+	if [[ -w "$logFile" ]];
+	then
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
+	else
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message"
+	fi
 }
 
 function main(){
-    echo "Log: $(date "+%F %T") Beginning Jamf Connect Removal script." | tee "$logPath"
+	if [[ -w "$logFile" ]];
+	then
+		printf "Log: $(date "+%F %T") Beginning Jamf Connect Removal script\n" | tee "$logFile"
+	else
+		printf "Log: $(date "+%F %T") Beginning Jamf Connect Removal script\n"
+	fi
 
     # Check if authchanger command exists
     if ! command -v /usr/local/bin/authchanger >/dev/null 2>&1;
