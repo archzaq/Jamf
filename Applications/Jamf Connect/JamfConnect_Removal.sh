@@ -7,7 +7,7 @@
 ### Version: 1.2       ###
 ##########################
 
-readonly logPath='/var/log/JamfConnect_Removal.log'
+readonly logFile='/var/log/JamfConnect_Removal.log'
 readonly jamfConnectFilesArray=(
     "/usr/local/lib/pam/pam_saml.so.2"
     "/Library/LaunchAgents/com.jamf.connect.plist"
