@@ -3,11 +3,13 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-01-23  ###
-### Updated: 07-24-25  ###
-### Version: 3.0       ###
+### Updated: 12-11-25  ###
+### Version: 3.1       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
+readonly currentHostName=$(/usr/sbin/scutil --get HostName)
+readonly currentComputerName=$(/usr/sbin/scutil --get ComputerName)
 readonly computerSerial=$(ioreg -l | grep IOPlatformSerialNumber | sed 's/"$//' | sed 's/.*"//')
 readonly serialShort=${computerSerial: -6}
 readonly logPath='/var/log/computerRename_Background.log'
@@ -15,23 +17,40 @@ standardName="SLU-$serialShort"
 
 # Append current status to log file
 function log_Message() {
-    local timestamp="$(date "+%F %T")"
-    printf "Log: %s %s\n" "$timestamp" "$1" | tee -a "$logPath"
+	local message="$1"
+	local type="${2:-Log}"
+	local timestamp="$(date "+%F %T")"
+	if [[ -w "$logFile" ]];
+	then
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
+	else
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message"
+	fi
 }
 
 # Validate serial number
 function serial_Check() {
     if [[ -z "$computerSerial" ]];
     then
-        log_Message "ERROR: Could not retrieve serial number"
+        log_Message "Could not retrieve serial number" "ERROR"
         return 1
     elif [[ ${#computerSerial} -lt 6 ]];
     then
-        log_Message "ERROR: Serial number too short: \"$computerSerial\""
+        log_Message "Serial number too short: \"$computerSerial\"" "ERROR"
         return 1
     else
         log_Message "Valid serial number found: \"$serialShort\""
         return 0
+    fi
+}
+
+function check_NamesMatch() {
+    log_Message "Checking name consistency"
+    if [[ "$currentName" != "$currentHostName" ]] || [[ "$currentName" != "$currentComputerName" ]];
+    then
+        log_Message "Name mismatch, standardizing to: \"$currentName\""
+        rename_Device "$currentName"
+        log_Message "Names synchronized, continuing with normal rename"
     fi
 }
 
@@ -45,20 +64,27 @@ function rename_Device() {
         /usr/sbin/scutil --set HostName "$name"
         /usr/local/bin/jamf recon	
     else
-        log_Message "ERROR: Name is empty"
+        log_Message "Name is empty" "ERROR"
         exit 1
     fi
 }
 
 function main() {
-    printf "Log: $(date "+%F %T") Beginning Computer Rename Background script\n" | tee "$logPath"
+    if [[ -w "$logFile" ]];
+	then
+		printf "Log: $(date "+%F %T") Beginning Automated Computer Rename script\n" | tee "$logFile"
+	else
+		printf "Log: $(date "+%F %T") Beginning Automated Computer Rename script\n"
+	fi
 
     log_Message "Checking for valid serial"
     if ! serial_Check;
     then
-        log_Message "ERROR: Exiting at serial check"
+        log_Message "Exiting at serial check" "ERROR"
         exit 1
     fi
+
+    check_NamesMatch
 
     # If the current device name contains "Mac",
     # rename it using the SLU standard.
