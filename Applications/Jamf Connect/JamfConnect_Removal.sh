@@ -2,9 +2,9 @@
 
 ##########################
 ### Author: Zac Reeves ###
-### Created: 7-25-23   ###
-### Updated: 3-11-25   ###
-### Version: 1.1       ###
+### Created: 07-25-23  ###
+### Updated: 12-11-25  ###
+### Version: 1.2       ###
 ##########################
 
 readonly logPath='/var/log/JamfConnect_Removal.log'
