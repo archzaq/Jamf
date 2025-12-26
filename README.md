@@ -50,7 +50,7 @@ Most scripts are designed to be deployed through Jamf Pro policies but some can 
 
 ## Documentation
 
-See `Info/Jamf-Commands.md` for detailed policy triggers and execution steps.
+See [`Info/Jamf-Commands.md`](https://github.com/archzaq/Jamf/blob/main/Info/Jamf-Commands.md) for detailed policy triggers and execution steps.
 
 ## Author
 
