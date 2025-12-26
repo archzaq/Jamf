@@ -29,7 +29,7 @@ Gathers information about the device and sends its status to Jamf Pro<br />
 sudo jamf policy -event Update
 ```
 #### Description
-Checks for missed [enrollment](#Enrollment) policies, [general](#General) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#JamfConnect) is installed<br />
+Checks for missed [enrollment](#Enrollment) policies, [general](#General) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#Jamf%20Connect) is installed<br />
 **Log Location:** `/var/log/updateInventory.log`<br />
 **Self Service:** `Update Inventory`
 #### Steps
@@ -37,7 +37,6 @@ Checks for missed [enrollment](#Enrollment) policies, [general](#General) polici
 
 
 # Maintenance
----
 ## Rename
 ```bash
 sudo jamf policy -event rename
@@ -74,7 +73,6 @@ Deletes the keychain named after the SPHardwareDataType UUID for each user on th
 
 
 # Utilities
----
 ## Elevated Account Creation
 ```bash
 sudo jamf policy -event ElevatedAccountCreation
@@ -107,7 +105,6 @@ Run this policy to check Secure Token status for all users on the device. This p
 
 
 # Jamf Connect
----
 ## InstallJamfConnect
 ```bash
 sudo jamf policy -event InstallJamfConnect
@@ -161,7 +158,6 @@ Installs the necessary packages for Jamf Connect, attempts to set the login scre
 
 
 # Security
----
 ## Cortex 8.8 Install
 ```bash
 sudo jamf policy -event Cortex8.8
@@ -186,7 +182,6 @@ Ensures the management account password isn't the old password, then attempts to
 
 
 # Self Service
----
 ## Adobe Acrobat Pro - Shared Install
 ```bash
 sudo jamf policy -event sharedAdobe
