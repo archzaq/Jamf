@@ -1,6 +1,6 @@
 ## Table of Contents
 1. [Main](#main)
-   - [General](#general)
+   - [General Policy](#general-policy)
    - [Enrollment](#enrollment)
    - [Recon](#recon)
    - [Update](#update)
@@ -26,7 +26,7 @@
 
 # Main
 
-## General
+## General Policy
 ```bash
 sudo jamf policy
 ```
@@ -55,7 +55,7 @@ Gathers information about the device and sends its status to Jamf Pro<br />
 sudo jamf policy -event Update
 ```
 #### Description
-Checks for missed [enrollment](#Enrollment) policies, [general](#General) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#Jamf-Connect) is installed<br />
+Checks for missed [enrollment](#Enrollment) policies, [general](#general-policy) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#Jamf-Connect) is installed<br />
 **Log Location:** `/var/log/updateInventory.log`<br />
 **Self Service:** `Update Inventory`
 #### Steps
