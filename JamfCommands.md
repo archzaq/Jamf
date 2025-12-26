@@ -82,7 +82,7 @@ sudo jamf policy -event managementFixNew
 sudo jamf policy -event managementFixOld
 ```
 #### Description
-Using a temporary admin account and the logged in user's secure token, this policy attempts to fix any issues that may exist with the management account. Ensures the username, password, admin permissions, and secure token status of the management account are correct<br />
+Using a temporary admin account and the logged in user's Secure Token, this policy attempts to fix any issues that may exist with the management account. Ensures the username, password, admin permissions, and Secure Token status of the management account are correct<br />
 **Log Location:** `/var/log/management_Fix.log`
 #### Steps
 1. Create `temp_management` account
@@ -199,12 +199,13 @@ Since I am unable to disable anti-tampering, this policy uninstalls Cortex XDR, 
 sudo jamf policy -event CyberArkUpdate
 ```
 #### Description
-Ensures the management account password isn't the old password, then attempts to install the new package<br />
+Ensures the management account password isn't the old password, then attempts to install the new package. **WILL ONLY INSTALL** if the management account exists, has the proper password, is an admin, and has a Secure Token<br />
 **Log Location:** `/var/log/CyberArk_Update.log`
 #### Steps
 1. `sudo jamf policy -event CyberArkPWChange`
 	- [`CyberArk EPM Agent - Pass Change - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/CyberArk/CyberArk_Update.sh)
 2. `sudo jamf policy -event CyberArk25.3`
+	- Installs CyberArk 25.3 package
 
 
 # Self Service
