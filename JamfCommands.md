@@ -1,3 +1,29 @@
+## Table of Contents
+1. [Main](#main)
+   - [General](#general)
+   - [Enrollment](#enrollment)
+   - [Recon](#recon)
+   - [Update](#update)
+2. [Maintenance](#maintenance)
+   - [Rename](#rename)
+   - [Management Account Fix](#management-account-fix)
+   - [Self Service Fix](#self-service-fix)
+3. [Utilities](#utilities)
+   - [Elevated Account Creation](#elevated-account-creation)
+   - [Network Reset](#network-reset)
+   - [Secure Token Manager](#secure-token-manager)
+4. [Jamf Connect](#jamf-connect)
+   - [InstallJamfConnect](#installjamfconnect)
+   - [RemoveJamfConnect](#removejamfconnect)
+   - [ReinstallJamfConnect](#reinstalljamfconnect)
+   - [RepairJamfConnect](#repairjamfconnect)
+5. [Security](#security)
+   - [Cortex 8.8 Install](#cortex-88-install)
+   - [CyberArk 25.3 Install](#cyberark-253-install)
+6. [Self Service](#self-service)
+   - [Adobe Acrobat Pro - Shared Install](#adobe-acrobat-pro---shared-install)
+   - [BitLocker Search](#bitlocker-search)
+
 # Main
 
 ## General
