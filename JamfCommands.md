@@ -29,7 +29,7 @@ Gathers information about the device and sends its status to Jamf Pro<br />
 sudo jamf policy -event Update
 ```
 #### Description
-Checks for missed [enrollment](#Enrollment) policies, [general](#General) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [[#Jamf Connect]] is installed<br />
+Checks for missed [enrollment](#Enrollment) policies, [general](#General) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#JamfConnect) is installed<br />
 **Log Location:** `/var/log/updateInventory.log`<br />
 **Self Service:** `Update Inventory`
 #### Steps
@@ -113,7 +113,7 @@ Run this policy to check Secure Token status for all users on the device. This p
 sudo jamf policy -event InstallJamfConnect
 ```
 #### Description
-Installs the necessary packages for Jamf Connect. The script attempts to ensure all Jamf Connect packages and configuration profiles are installed before continuing. May get stuck during the [[#Recon]] part of the script<br />
+Installs the necessary packages for Jamf Connect. The script attempts to ensure all Jamf Connect packages and configuration profiles are installed before continuing. May get stuck during the [recon](#Recon) part of the script<br />
 **Log Location:** `/var/log/JamfConnect_Deployment.log`
 #### Steps
 1. Installs three packages
@@ -137,7 +137,7 @@ Attempts to remove Jamf Connect application, Managed Preferences, Application Su
 sudo jamf policy -event ReinstallJamfConnect
 ```
 #### Description
-Checks for Jamf Connect Application, Security Bundle, or PLIST file. If found, runs [[#RemoveJamfConnect]], then [[#InstallJamfConnect]]<br />
+Checks for Jamf Connect Application, Security Bundle, or PLIST file. If found, runs [RemoveJamfConnect](#RemoveJamfConnect), then [InstallJamfConnect](#InstallJamfConnect)<br />
 **Log Location:** `/var/log/JamfConnect_Reinstall.log`<br />
 **Self Service:** `Jamf Connect - Install`
 #### Steps
@@ -148,7 +148,7 @@ Checks for Jamf Connect Application, Security Bundle, or PLIST file. If found, r
 sudo jamf policy -event RepairJamfConnect
 ```
 #### Description
-Installs the necessary packages for Jamf Connect, attempts to set the login screen to use Jamf Connect, then runs [[#Recon]]<br />
+Installs the necessary packages for Jamf Connect, attempts to set the login screen to use Jamf Connect, then runs [recon](#Recon)<br />
 **Log Location:** `/var/log/jamf.log`
 #### Steps
 1. Installs four packages
