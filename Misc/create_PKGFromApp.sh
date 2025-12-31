@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 12-30-25  ###
-### Updated: 12-30-25  ###
-### Version: 1.0       ###
+### Updated: 12-31-25  ###
+### Version: 1.1       ###
 ##########################
 
 readonly allArgs="$@"
@@ -187,6 +187,7 @@ function main() {
     log_Message "PKG signature:"
     spctl -a -t install -vv "$fullSignedPKGOutputPath" | tee -a "$logFile"
     log_Message "Process complete!"
+    exit 0
 }
 
 main
