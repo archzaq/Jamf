@@ -59,7 +59,7 @@ Checks for missed [enrollment](#Enrollment) policies, [general](#general-policy)
 **Log Location:** `/var/log/updateInventory.log`<br />
 **Self Service:** `Update Inventory`
 #### Steps
-1. [`Maintenance - Check Policy and Update Inventory - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Maintenance/updateInventory.sh)
+1. [`Maintenance - Check Policy and Update Inventory - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/updateInventory.sh)
 
 
 # Maintenance
@@ -71,7 +71,7 @@ sudo jamf policy -event rename
 Prompts the user to choose their department prefix then sets the device name to `Prefix-Serial` using the last six characters of the serial number. If the device name already has a prefix, ask the user if they would like to keep the existing prefix<br />
 **Log Location:** `/var/log/computerRenameMenu.log`
 #### Steps
-1. [`Computer Rename - Department Menu - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Maintenance/ComputerRenameMENU.sh)
+1. [`Computer Rename - Department Menu - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/ComputerRenameMENU.sh)
 
 ## Management Account Fix
 ```bash
@@ -86,7 +86,7 @@ Using a temporary admin account and the logged in user's Secure Token, this poli
 **Log Location:** `/var/log/management_Fix.log`
 #### Steps
 1. Create `temp_management` account
-2. [`Maintenance - Management Account Fix - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Maintenance/management_Fix.sh)
+2. [`Maintenance - Management Account Fix - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/management_Fix.sh)
 
 ## Self Service Fix
 ```bash
@@ -95,7 +95,7 @@ sudo jamf policy -event FixSelfService
 #### Description
 Deletes the keychain named after the SPHardwareDataType UUID for each user on the device<br />
 #### Steps
-1. [`Self Service - Keychain Issues - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Maintenance/selfService_Fix.sh)
+1. [`Self Service - Keychain Issues - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/selfService_Fix.sh)
 
 
 # Utilities
@@ -107,7 +107,7 @@ sudo jamf policy -event ElevatedAccountCreation
 If a device has been approved for an admin account, this policy will be available. Running this policy will create the local admin account and prompt the currently signed in user for the password to use for the account. If the account already exists, the current user will be asked if they want to delete and recreate the local admin account (forgotten password)<br />
 **Log Location:** `/var/log/elevatedAccount_Creation.log`
 #### Steps
-1. [`Elevate Account Creation - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Utilities/elevatedAccount_Creation.sh)
+1. [`Elevate Account Creation - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/elevatedAccount_Creation.sh)
 
 ## Network Reset
 ```bash
@@ -117,7 +117,7 @@ sudo jamf policy -event NetworkReset
 Attempts to hard reset all network settings of a device, needs work honestly<br />
 **Log Location:** `/var/log/networkReset.log`
 #### Steps
-1. [`Network Reset - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Utilities/network_Reset.sh)
+1. [`Network Reset - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/network_Reset.sh)
 
 ## Secure Token Manager
 ```bash
@@ -127,7 +127,7 @@ sudo jamf policy -event SecureTokenManager
 Run this policy to check Secure Token status for all users on the device. This policy can also be used to add or remove Secure Tokens
 #### Steps
 1. Create `temp_management` account
-2. [`Secure Token - Token Manager - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Utilities/token_Manager.sh)
+2. [`Secure Token - Token Manager - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/token_Manager.sh)
 
 
 # Jamf Connect
@@ -143,7 +143,7 @@ Installs the necessary packages for Jamf Connect. The script attempts to ensure 
 	- Jamf Connect Launch Agent
 	- SLU Logos Jamf Connect Signed - Package
 	- Jamf Connect 2.44
-2. [`Jamf Connect - Deployment - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Applications/Jamf%20Connect/JamfConnect_Deployment.sh)
+2. [`Jamf Connect - Deployment - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Jamf%20Connect/JamfConnect_Deployment.sh)
 
 ## RemoveJamfConnect
 ```bash
@@ -153,7 +153,7 @@ sudo jamf policy -event RemoveJamfConnect
 Attempts to remove Jamf Connect application, Managed Preferences, Application Support Receipts, Security Agent Login Bundle, and JamfConnect Application Support folder<br />
 **Log Location:** `/var/log/JamfConnect_Removal.log`
 #### Steps
-1. [`Jamf Connect - Removal - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Applications/Jamf%20Connect/JamfConnect_Removal.sh)
+1. [`Jamf Connect - Removal - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Jamf%20Connect/JamfConnect_Removal.sh)
 
 ## ReinstallJamfConnect
 ```bash
@@ -164,7 +164,7 @@ Checks for Jamf Connect Application, Security Bundle, or PLIST file. If found, r
 **Log Location:** `/var/log/JamfConnect_Reinstall.log`<br />
 **Self Service:** `Jamf Connect - Install`
 #### Steps
-1. [`Jamf Connect - Removal and Reinstall - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Applications/Jamf%20Connect/JamfConnect_Reinstall.sh)
+1. [`Jamf Connect - Removal and Reinstall - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Jamf%20Connect/JamfConnect_Reinstall.sh)
 
 ## RepairJamfConnect 
 ```bash
@@ -192,7 +192,7 @@ sudo jamf policy -event Cortex8.8
 Since I am unable to disable anti-tampering, this policy uninstalls Cortex XDR, attempts to install version 8.8, then attempts to check-in with Cortex. If unable to install Cortex 8.8, attempt to install Cortex 8.5<br />
 **Log Location:** `/var/log/cortex_Upgrade.log`
 #### Steps
-1. [`Cortex XDR - Upgrade - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Applications/Cortex/cortex_Upgrade.sh)
+1. [`Cortex XDR - Upgrade - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Cortex/cortex_Upgrade.sh)
 
 ## CyberArk 25.3 Install
 ```bash
@@ -203,7 +203,7 @@ Ensures the management account password isn't the old password, then attempts to
 **Log Location:** `/var/log/CyberArk_Update.log`
 #### Steps
 1. `sudo jamf policy -event CyberArkPWChange`
-	- [`CyberArk EPM Agent - Pass Change - Script`](https://github.com/slu-its/jamf-scripts/blob/main/Applications/CyberArk/CyberArk_Update.sh)
+	- [`CyberArk EPM Agent - Pass Change - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/CyberArk/CyberArk_Update.sh)
 2. `sudo jamf policy -event CyberArk25.3`
 	- Installs CyberArk 25.3 package
 
