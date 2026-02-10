@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
-### Updated: 09-02-25  ###
-### Version: 2.4       ###
+### Updated: 02-09-26  ###
+### Version: 3.0       ###
 ##########################
 
 managementAccount="$4"
@@ -12,22 +12,30 @@ managementAccountPass="$5"
 elevatedAccount="$6"
 elevatedAccountPass=''
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+readonly currentUserHomePath="${HOME:-/Users/${currentUser}}"
 readonly logFile='/var/log/elevatedAccount_Creation.log'
+readonly outputFile="${currentUserHomePath}/Desktop/HowTo_AdminAccount.txt"
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='SLU ITS: Elevated Account Creation'
 readonly maxAttempts=10
+activeIcon="$SLUIconFile"
 
 # Append current status to log file
 function log_Message() {
-    local message="$1"
-    local logType="${2:-Log}"
-    local timestamp="$(date "+%F %T")"
-    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
+	local message="$1"
+	local type="${2:-Log}"
+	local timestamp="$(date "+%F %T")"
+	if [[ -w "$logFile" ]];
+	then
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
+	else
+		printf "%s: %s %s\n" "$type" "$timestamp" "$message"
+	fi
 }
 
 # Ensure external arguments are passed
-function arg_Check() {
+function check_Args() {
     if [[ -z "$managementAccount" ]] || [[ -z "$managementAccountPass" ]] || [[ -z "$elevatedAccount" ]]; 
     then
         log_Message "Missing critical arguments" "ERROR"
@@ -37,63 +45,62 @@ function arg_Check() {
 }
 
 # Check for valid icon file, AppleScript dialog boxes will error without it
-function icon_Check() {
-    activeIcon="$SLUIconFile"
-    if [[ ! -f "$activeIcon" ]];
-    then
-        log_Message "No SLU icon found"
-        if [[ -f '/usr/local/bin/jamf' ]];
-        then
-            log_Message "Attempting icon install via Jamf"
-            /usr/local/bin/jamf policy -event SLUFonts
-        else
-            log_Message "No Jamf binary found"
-        fi
-        if [[ ! -f "$activeIcon" ]];
-        then
-            if [[ -f "$genericIconFile" ]];
-            then
-                log_Message "Generic icon found"
-                activeIcon="$genericIconFile"
-            else
-                log_Message "Generic icon not found" "ERROR"
-                return 1
-            fi
-        fi
-    else
-        log_Message "SLU icon found"
-    fi
-    return 0
+function check_Icon() {
+	if [[ ! -f "$activeIcon" ]];
+	then
+		log_Message "No SLU icon found" "WARN"
+		if [[ -f '/usr/local/bin/jamf' ]];
+		then
+			log_Message "Attempting icon install via Jamf"
+			/usr/local/bin/jamf policy -event SLUFonts
+		else
+			log_Message "No Jamf binary found" "WARN"
+		fi
+		if [[ ! -f "$activeIcon" ]];
+		then
+			if [[ -f "$genericIconFile" ]];
+			then
+				log_Message "Generic icon found"
+				activeIcon="$genericIconFile"
+			else
+				log_Message "Generic icon not found" "ERROR"
+				return 1
+			fi
+		fi
+	else
+		log_Message "SLU icon found"
+	fi
+	return 0
 }
 
 # Check if someone is logged into the device
-function login_Check() {
-    if [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == 'root' ]];
-    then
-        log_Message "No one currently logged in" "ERROR"
-        return 1
-    else
-        log_Message "Currently logged in: \"${currentUser}\""
-        return 0
-    fi
+function check_Login() {
+	if [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == 'root' ]];
+	then
+		log_Message "No one currently logged in"
+		return 1
+	else
+		log_Message "${currentUser} currently logged in"
+		return 0
+	fi
 }
 
 # Check if account exists
-function account_Check() {
-    local account="$1"
-    /usr/bin/id "$account" &>/dev/null
-    return $?
+function check_Account() {
+	local account="$1"
+	/usr/bin/id "$account" >/dev/null
+	return $?
 }
 
 # Check if account is in the admin group
-function admin_Check(){
+function check_Admin(){
     local account="$1"
     /usr/sbin/dseditgroup -o checkmember -m "$account" admin &>/dev/null
     return $?
 }
 
 # Check account for Secure Token
-function token_Check() {
+function check_SecureToken() {
     local account="$1"
     /usr/sbin/sysadminctl -secureTokenStatus "$account" 2>&1 | grep -q 'ENABLED'
     return $?
@@ -109,7 +116,7 @@ function create_AdminAccount() {
     if /usr/sbin/sysadminctl -addUser "$accountAdd" -password "$accountAddPass" -home "$accountAddPath" -admin -adminUser "$adminAccount" -adminPassword "$adminPass" &>/dev/null;
     then
         log_Message "Successfully created account: \"${accountAdd}\""
-        if account_Check "$accountAdd";
+        if check_Account "$accountAdd";
         then
             dirs=("Applications" "Desktop" "Documents" "Downloads" "Movies" "Music" "Pictures" "Public")
             for dir in "${dirs[@]}";
@@ -133,18 +140,28 @@ function create_AdminAccount() {
 }
 
 # Assigns Secure Token to an account
-function assign_Token(){
-    local adminAccount="$1"
-    local adminPass="$2"
-    local tokenEnableAccount="$3"
-    local tokenEnablePass="$4"
-    local output
-    output=$(/usr/sbin/sysadminctl -adminUser "$adminAccount" -adminPassword "$adminPass" -secureTokenOn "$tokenEnableAccount" -password "$tokenEnablePass" 2>&1)
-    if token_Check "$tokenEnableAccount";
+function token_Action() {
+    local tokenAccount="$1"
+    local tokenPassword="$2"
+    local adminAccount="$3"
+    local adminPassword="$4"
+    local tokenAction="$5"
+    local result
+    if [[ "$tokenAction" == 'Add Token' ]];
+    then
+        result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOn \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
+    elif [[ "$tokenAction" == 'Remove Token' ]];
+    then
+        result=$(su "$adminAccount" -c "/usr/sbin/sysadminctl -secureTokenOff \"$tokenAccount\" -password \"$tokenPassword\" -adminUser \"$adminAccount\" -adminPassword \"$adminPassword\"" 2>&1)
+    else
+        log_Message "Invalid token action" "ERROR"
+        return 1
+    fi
+    if check_SecureToken "$tokenEnableAccount";
     then
         return 0
     else
-        log_Message "Assign token failed, sysadminctl output: $output" "ERROR"
+        log_Message "Assign token failed, sysadminctl output: ${result}" "ERROR"
         return 1
     fi
 }
@@ -166,18 +183,79 @@ function validate_Password() {
     return 0
 }
 
+function write_InfoFile() {
+    log_Message "Creating output file at: $outputFile"
+    if touch "$outputFile";
+    then
+        cat > "$outputFile" << OOP
+  SLU ITS: Local Admin Account 
+
+  Account Username:  elevate
+  Account Password:  The password you created during your remote session
+  
+  When to use it:    ONLY when an admin prompt appears
+                     (installing or updating software, changing system settings)
+
+  When NOT to use it: Do NOT use this account to log into your Mac.
+                      Continue signing in with your SLU Net ID as usual.
+
+
+Frequently Asked Questions
+
+Q: How do I log into my Mac?
+A: Nothing has changed with how you log in. Continue to sign in with
+   your SLU Net ID and password as you always have.
+
+Q: When do I use the elevate account?
+A: When you try to install or update an application, or make a change
+   to your system settings, macOS may display a prompt asking for an
+   administrator username and password. This is when you use the
+   elevate account. Enter "elevate" as the username and the password
+   you created during our remote session.
+
+Q: What does the admin prompt look like?
+A: It is a small window that appears asking for an administrator name
+   and password. It typically shows up when installing new software,
+   running updates, or modifying system preferences that require
+   elevated permissions.
+
+Q: I forgot my elevate account password. What do I do?
+A: Two options:
+            1. Copy and paste the following command into the Terminal:
+                sudo jamf policy -event ElevatedAccountCreation
+            2. Reach out to SLU IT at ask.slu.edu
+
+Q: Can I change the elevate account password?
+A: Yes. Open System Settings, go to Users & Groups, select the
+   elevate account, and choose Change Password. You will need your
+   current elevate password to make this change.
+
+  Account created on: $(date "+%F %T")
+  This file was placed on your Desktop for your reference.
+  Feel free to keep it or delete it once you are comfortable
+  with the information above.
+OOP
+    else
+        log_Message "Unable to create information file on Desktop"
+        return 1
+    fi
+    return 0
+}
+
 # AppleScript - Informing the user and giving them two choices
 function binary_Dialog() {
     local promptString="$1"
+    local mainButton="$2"
     local count=1
     while [ $count -le $maxAttempts ];
     do
         binDialog=$(/usr/bin/osascript <<OOP
         try
             set promptString to "$promptString"
+            set mainButton to "$mainButton"
             set iconPath to "$activeIcon"
             set dialogTitle to "$dialogTitle"
-            set dialogResult to display dialog promptString buttons {"Cancel", "Yes"} default button "Yes" with icon POSIX file iconPath with title dialogTitle giving up after 900
+            set dialogResult to display dialog promptString buttons {"Cancel", mainButton} default button mainButton with icon POSIX file iconPath with title dialogTitle giving up after 900
             set buttonChoice to button returned of dialogResult
             if buttonChoice is equal to "" then
                 return "TIMEOUT"
@@ -191,15 +269,16 @@ OOP
         )
         case "$binDialog" in
             'CANCEL' | 'Cancel')
-                log_Message "User responded with: $binDialog"
+                log_Message "User responded with: \"$binDialog\""
                 return 1
                 ;;
-            'TIMEOUT')
-                log_Message "No response, re-prompting ($count/10)" "WARNING"
+            'TIMEOUT' | '')
+                log_Message "No response, re-prompting ($count/10)"
                 ((count++))
+                sleep 1
                 ;;
             *)
-                log_Message "User responded with: $binDialog"
+                log_Message "User responded with: \"$binDialog\""
                 return 0
                 ;;
         esac
@@ -313,28 +392,28 @@ function main() {
     trap "clean_Exit" EXIT INT TERM HUP
     printf "Log: $(date "+%F %T") Beginning Elevated Account Creation script\n" | tee "$logFile"
 
-    if ! arg_Check;
+    if ! check_Args;
     then
         log_Message "Exiting at argument check"
         exit 1
     fi
 
     log_Message "Checking for icon file"
-    if ! icon_Check;
+    if ! check_Icon;
     then
         log_Message "Exiting at icon check"
         exit 1
     fi
 
     log_Message "Checking for currently logged in user"
-    if ! login_Check;
+    if ! check_Login;
     then
         log_Message "Exiting at login check"
         exit 1
     fi
 
     log_Message "Checking for: \"$managementAccount\""
-    if ! account_Check "$managementAccount";
+    if ! check_Account "$managementAccount";
     then
         log_Message "Management account does not exist, exiting" "ERROR"
         alert_Dialog "Missing Account" "${managementAccount} account does not exist!"
@@ -342,10 +421,10 @@ function main() {
     fi
 
     log_Message "Checking for: \"$elevatedAccount\""
-    if account_Check "$elevatedAccount";
+    if check_Account "$elevatedAccount";
     then
         log_Message "Elevate account already exists" "WARN"
-        if ! binary_Dialog "'elevate' account already exists!\n\nWould you like to delete this account and create a new one?";
+        if ! binary_Dialog "'elevate' account already exists!\n\nWould you like to delete this account and create a new one?" "Yes";
         then
             log_Message "Exiting at binary dialog"
             exit 1
@@ -362,7 +441,7 @@ function main() {
     fi
 
     log_Message "Checking permissions for: \"$managementAccount\""
-    if ! admin_Check "$managementAccount";
+    if ! check_Admin "$managementAccount";
     then
         log_Message "Management account is not an admin, exiting" "ERROR"
         alert_Dialog "Insufficient Permissions" "${managementAccount} account is not an admin!"
@@ -418,13 +497,13 @@ function main() {
         exit 1
     fi
 
-    if ! token_Check "$elevatedAccount";
+    if ! check_SecureToken "$elevatedAccount";
     then
-        log_Message "Secure Token not assigned to: \"${elevatedAccount}\""
-        if token_Check "$managementAccount";
+        log_Message "Secure Token not assigned to: \"${elevatedAccount}\"" "WARN"
+        if check_SecureToken "$managementAccount";
         then
             log_Message "Secure Token present for: \"${managementAccount}\""
-            if ! assign_Token "$managementAccount" "$managementAccountPass" "$elevatedAccount" "$elevatedAccountPass";
+            if ! token_Action "$elevatedAccount" "$elevatedAccountPass" "$managementAccount" "$managementAccountPass" "Add Token";
             then
                 log_Message "Unable to assign Secure Token to: \"${elevatedAccount}\"" "ERROR"
             else
@@ -438,7 +517,19 @@ function main() {
     fi
     clean_Env
     
-    /usr/bin/osascript -e 'display dialog "Process completed successfully!" buttons {"OK"} default button "OK" with icon POSIX file "'"$activeIcon"'" with title "'"$dialogTitle"'"' &>/dev/null
+    write_InfoFile
+    outputFileWritten=$?
+    binary_Dialog "Process completed successfully!" "OK"
+    if [[ $outputFileWritten -eq 0 ]];
+    then
+        if binary_Dialog "Would you like to open the local admin account information document?" "Yes";
+        then
+            open "$outputFile"
+        fi
+    else
+        log_Message "Output File Written, false"
+    fi
+
     log_Message "Elevated Account Creation finished!" "EXIT"
     exit 0
 }
