@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
 ### Updated: 02-09-26  ###
-### Version: 3.0       ###
+### Version: 3.1       ###
 ##########################
 
 managementAccount="$4"
@@ -235,6 +235,7 @@ A: Yes. Open System Settings, go to Users & Groups, select the
   Feel free to keep it or delete it once you are comfortable
   with the information above.
 OOP
+    chown "$currentUser":staff "$outputFile"
     else
         log_Message "Unable to create information file on Desktop"
         return 1
@@ -246,6 +247,7 @@ OOP
 function binary_Dialog() {
     local promptString="$1"
     local mainButton="$2"
+    local secondButton="$3"
     local count=1
     while [ $count -le $maxAttempts ];
     do
@@ -253,9 +255,14 @@ function binary_Dialog() {
         try
             set promptString to "$promptString"
             set mainButton to "$mainButton"
+            set secondButton to "$secondButton"
             set iconPath to "$activeIcon"
             set dialogTitle to "$dialogTitle"
-            set dialogResult to display dialog promptString buttons {"Cancel", mainButton} default button mainButton with icon POSIX file iconPath with title dialogTitle giving up after 900
+            if secondButton is equal to "" then
+                set dialogResult to display dialog promptString buttons {mainButton} default button mainButton with icon POSIX file iconPath with title dialogTitle giving up after 900
+            else
+                set dialogResult to display dialog promptString buttons {secondButton, mainButton} default button mainButton with icon POSIX file iconPath with title dialogTitle giving up after 900
+            end if
             set buttonChoice to button returned of dialogResult
             if buttonChoice is equal to "" then
                 return "TIMEOUT"
@@ -268,7 +275,7 @@ function binary_Dialog() {
 OOP
         )
         case "$binDialog" in
-            'CANCEL' | 'Cancel')
+            'CANCEL' | 'Cancel' | "$secondButton")
                 log_Message "User responded with: \"$binDialog\""
                 return 1
                 ;;
@@ -424,10 +431,10 @@ function main() {
     if check_Account "$elevatedAccount";
     then
         log_Message "Elevate account already exists" "WARN"
-        if ! binary_Dialog "'elevate' account already exists!\n\nWould you like to delete this account and create a new one?" "Yes";
+        if ! binary_Dialog "'elevate' account already exists!\n\nWould you like to delete this account and create a new one?" "Yes" "No";
         then
             log_Message "Exiting at binary dialog"
-            exit 1
+            exit 0
         else
             log_Message "Deleting elevate account"
             if sysadminctl -deleteUser "$elevatedAccount" -secure &>/dev/null;
@@ -452,7 +459,8 @@ function main() {
     while [[ "$validPass" == false ]];
     do
         log_Message "Prompting user for elevated account INFO"
-        if ! textField_Dialog "Please enter the password you would like to use for your admin account:" "hidden";
+        requirements="\n\nYour password must include:\n• At least 10 characters\n• An uppercase letter\n• A number"
+        if ! textField_Dialog "Please enter the password you would like to use for your admin account:${requirements}" "hidden";
         then
             log_Message "Exiting at INFO prompt"
             exit 0
@@ -522,12 +530,15 @@ function main() {
     binary_Dialog "Process completed successfully!" "OK"
     if [[ $outputFileWritten -eq 0 ]];
     then
-        if binary_Dialog "Would you like to open the local admin account information document?" "Yes";
+        if binary_Dialog "Would you like to open the HowTo_AdminAccount document created on your Desktop for further information on your Admin Account?" "Yes" "No";
         then
+            log_Message "Opening output file"
             open "$outputFile"
+        else
+            log_Message "Skipping opening of output file"
         fi
     else
-        log_Message "Output File Written, false"
+        log_Message "Unable to write to output file" "WARN"
     fi
 
     log_Message "Elevated Account Creation finished!" "EXIT"
