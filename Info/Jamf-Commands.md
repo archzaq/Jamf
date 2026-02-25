@@ -19,12 +19,13 @@
    - [ReinstallJamfConnect](#reinstalljamfconnect)
    - [RepairJamfConnect](#repairjamfconnect)
 5. [Security](#security)
-   - [Cortex 8.8 Install](#cortex-88-install)
-   - [CyberArk 25.3 Install](#cyberark-253-install)
-   - [Rapid7 Install](#rapid7-install)
+   - [Cortex 8.8](#cortex-88)
+   - [CyberArk 25.3](#cyberark-253)
+   - [Rapid7](#rapid7)
 6. [Self Service](#self-service)
    - [Adobe Acrobat Pro](#adobe-acrobat-pro)
-   - [Adobe Acrobat Pro - Shared Install](#adobe-acrobat-pro---shared-install)
+   - [Adobe Acrobat Pro - Shared](#adobe-acrobat-pro---shared)
+   - [Air Media](#airmedia)
    - [BitLocker Search](#bitlocker-search)
    - [Device Status Check](#device-status-check)
    - [EndNote 21](#endnote-21)
@@ -227,7 +228,7 @@ Installs the necessary packages for Jamf Connect, attempts to set the login scre
 
 
 # Security
-## Cortex 8.8 Install
+## Cortex 8.8
 ```bash
 sudo jamf policy -event Cortex8.8
 ```
@@ -238,7 +239,7 @@ Since I am unable to disable anti-tampering, this policy uninstalls Cortex XDR, 
 #### Steps
 1. [`Cortex XDR - Upgrade - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Cortex/cortex_Upgrade.sh)
 
-## CyberArk 25.3 Install
+## CyberArk 25.3
 ```bash
 sudo jamf policy -event CyberArkUpdate
 ```
@@ -252,7 +253,7 @@ Ensures the management account password isn't the old password, then attempts to
 2. `sudo jamf policy -event CyberArk25.3`
 	- Installs CyberArk 25.3 package
 
-## Rapid7 Install
+## Rapid7
 ```bash
 sudo jamf policy -event InstallRapid7
 ```
@@ -279,7 +280,7 @@ Installs Adobe Acrobat Pro and Creative Cloud<br />
 	- macOS (Universal) Adobe Pro - 11-15-24.pkg
 2. `sudo jamf recon`
 
-## Adobe Acrobat Pro - Shared Install
+## Adobe Acrobat Pro - Shared
 ```bash
 sudo jamf policy -event sharedAdobe
 ```
@@ -291,6 +292,18 @@ Installs Adobe Acrobat Pro and Creative Cloud for lab devices. Installing from S
 1. Installs one package
 	- macOS (Universal) - en_US_MACUNIVERSAL.pkg
 2. `sudo jamf recon`
+
+## AirMedia
+```bash
+sudo jamf policy -event InstallAirMedia
+```
+#### Description
+Installs AirMedia 4.1.14<br />
+**Frequency:** `Ongoing`<br />
+**Self Service Name:** `AirMedia`
+#### Steps
+1. Installs one package
+	- airmedia_osx_4.1.14_installer.pkg
 
 ## BitLocker Search
 ```bash
