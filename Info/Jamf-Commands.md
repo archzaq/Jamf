@@ -25,7 +25,7 @@
 6. [Self Service](#self-service)
    - [Adobe Acrobat Pro](#adobe-acrobat-pro)
    - [Adobe Acrobat Pro - Shared](#adobe-acrobat-pro---shared)
-   - [Air Media](#airmedia)
+   - [AirMedia](#airmedia)
    - [BitLocker Search](#bitlocker-search)
    - [Device Status Check](#device-status-check)
    - [EndNote 21](#endnote-21)
