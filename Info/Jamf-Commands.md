@@ -48,7 +48,7 @@ sudo jamf policy
 ```
 #### Description
 Checks for any pending/missing policies and installs them<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/jamf.log`
 
 ## Enrollment
@@ -57,7 +57,7 @@ sudo jamf policy -event enrollmentComplete
 ```
 #### Description
 Checks for any pending/missed policies set to run after a device's enrollment into Jamf<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/jamf.log`
 
 ## Recon
@@ -66,7 +66,7 @@ sudo jamf recon
 ```
 #### Description
 Gathers information about the device and sends its status to Jamf Pro<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `??`
 
 ## Update
@@ -75,7 +75,7 @@ sudo jamf policy -event Update
 ```
 #### Description
 Checks for missed [enrollment](#Enrollment) policies, [general](#general-policy) policies, runs [recon](#Recon), ensures Rosetta is installed, ensure the device doesn't have mismatched names, and ensures [Jamf Connect](#Jamf-Connect) is installed<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/updateInventory.log`<br />
 **Self Service Name:** `Update Inventory`
 #### Steps
@@ -89,7 +89,7 @@ sudo jamf policy -event rename
 ```
 #### Description
 Prompts the user to choose their department prefix then sets the device name to `Prefix-Serial` using the last six characters of the serial number. If the device name already has a prefix, ask the user if they would like to keep the existing prefix<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/computerRenameMenu.log`
 #### Steps
 1. [`Computer Rename - Department Menu - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/ComputerRenameMENU.sh)
@@ -104,7 +104,7 @@ sudo jamf policy -event managementFixOld
 ```
 #### Description
 Using a temporary admin account and the logged in user's Secure Token, this policy attempts to fix any issues that may exist with the management account. Ensures the username, password, admin permissions, and Secure Token status of the management account are correct<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/management_Fix.log`
 #### Steps
 1. Create `temp_management` account
@@ -116,7 +116,7 @@ sudo jamf policy -event FixSelfService
 ```
 #### Description
 Deletes the keychain named after the SPHardwareDataType UUID for each user on the device<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/selfService_Fix.log`
 #### Steps
 1. [`Self Service - Keychain Issues - Script`](https://github.com/archzaq/Jamf/blob/main/Maintenance/selfService_Fix.sh)
@@ -129,7 +129,7 @@ sudo jamf policy -event ElevatedAccountCreation
 ```
 #### Description
 If a device has been approved for an admin account, this policy will be available. Running this policy will create the local admin account and prompt the currently signed in user for the password to use for the account. If the account already exists, the current user will be asked if they want to delete and recreate the local admin account (forgotten password)<br />
-**Frequency:** `Ongoing` - only for those approved to have admin accounts
+**Frequency:** `Ongoing` - only for those approved to have admin accounts<br />
 **Log Location:** `/var/log/elevatedAccount_Creation.log`
 #### Steps
 1. [`Elevate Account Creation - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/elevatedAccount_Creation.sh)
@@ -140,7 +140,7 @@ sudo jamf policy -event MenuBarSpacing
 ```
 #### Description
 Attempts to reduce the blank space around all the icons in the top right of the menu bar<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/menuBar_Spacing.log`
 #### Steps
 1. [`Menu Bar Spacing - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/menuBar_Spacing.sh)
@@ -151,7 +151,7 @@ sudo jamf policy -event NetworkReset
 ```
 #### Description
 Attempts to hard reset all network settings of a device, needs work honestly<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/networkReset.log`
 #### Steps
 1. [`Network Reset - Script`](https://github.com/archzaq/Jamf/blob/main/Utilities/network_Reset.sh)
@@ -162,7 +162,7 @@ sudo jamf policy -event SecureTokenManager
 ```
 #### Description
 Run this policy to check Secure Token status for all users on the device. This policy can also be used to add or remove Secure Tokens<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/token_Manager.log`
 #### Steps
 1. Create `temp_management` account
@@ -176,7 +176,7 @@ sudo jamf policy -event InstallJamfConnect
 ```
 #### Description
 Installs the necessary packages for Jamf Connect. The script attempts to ensure all Jamf Connect packages and configuration profiles are installed before continuing. May get stuck during the [recon](#Recon) part of the script<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/JamfConnect_Deployment.log`
 #### Steps
 1. Installs three packages
@@ -191,7 +191,7 @@ sudo jamf policy -event RemoveJamfConnect
 ```
 #### Description
 Attempts to remove Jamf Connect application, Managed Preferences, Application Support Receipts, Security Agent Login Bundle, and JamfConnect Application Support folder. May get stuck during the [recon](#Recon) part of the script<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/JamfConnect_Removal.log`
 #### Steps
 1. [`Jamf Connect - Removal - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Jamf%20Connect/JamfConnect_Removal.sh)
@@ -202,7 +202,7 @@ sudo jamf policy -event ReinstallJamfConnect
 ```
 #### Description
 Checks for Jamf Connect Application, Security Bundle, or PLIST file. If found, runs [RemoveJamfConnect](#RemoveJamfConnect), then [InstallJamfConnect](#InstallJamfConnect)<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/JamfConnect_Reinstall.log`<br />
 **Self Service Name:** `Jamf Connect - Install`
 #### Steps
@@ -214,7 +214,7 @@ sudo jamf policy -event RepairJamfConnect
 ```
 #### Description
 Installs the necessary packages for Jamf Connect, attempts to set the login screen to use Jamf Connect, then runs [recon](#Recon). Probably useless as [Reinstall](#ReinstallJamfConnect) or [Install](#InstallJamfConnect) generally works. The only addition is running the authchanger command at the end<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Log Location:** `/var/log/jamf.log`
 #### Steps
 1. Installs four packages
@@ -233,7 +233,7 @@ sudo jamf policy -event Cortex8.8
 ```
 #### Description
 Since I am unable to disable anti-tampering, this policy uninstalls Cortex XDR, attempts to install version 8.8, then attempts to check-in with Cortex. If unable to install Cortex 8.8, attempt to install Cortex 8.5<br />
-**Frequency:** `Once per computer`
+**Frequency:** `Once per computer`<br />
 **Log Location:** `/var/log/cortex_Upgrade.log`
 #### Steps
 1. [`Cortex XDR - Upgrade - Script`](https://github.com/archzaq/Jamf/blob/main/Applications/Cortex/cortex_Upgrade.sh)
@@ -244,7 +244,7 @@ sudo jamf policy -event CyberArkUpdate
 ```
 #### Description
 Ensures the management account password isn't the old password, then attempts to install the new package. **WILL ONLY INSTALL** if the management account exists, has the proper password, is an admin, and has a Secure Token<br />
-**Frequency:** `Once per computer`
+**Frequency:** `Once per computer`<br />
 **Log Location:** `/var/log/CyberArk_Update.log`
 #### Steps
 1. `sudo jamf policy -event CyberArkPWChange`
@@ -258,7 +258,7 @@ sudo jamf policy -event InstallRapid7
 ```
 #### Description
 Installs Rapid7 Agent<br />
-**Frequency:** `Once per computer`
+**Frequency:** `Once per computer`<br />
 **Log Location:** `/var/log/jamf.log`
 #### Steps
 1. Installs one package
@@ -272,7 +272,7 @@ sudo jamf policy -event InstallAdobe
 ```
 #### Description
 Installs Adobe Acrobat Pro and Creative Cloud<br /> 
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `Adobe Acrobat DC`
 #### Steps
 1. Installs one package
@@ -285,7 +285,7 @@ sudo jamf policy -event sharedAdobe
 ```
 #### Description
 Installs Adobe Acrobat Pro and Creative Cloud for lab devices. Installing from Self Service also runs `caffeinate -d` so the device doesn't sleep during the long installation<br />
-**Frequency:** `Ongoing` - only for Lab devices
+**Frequency:** `Ongoing` - only for Lab devices<br />
 **Self Service Name:** `Adobe Application Suite`
 #### Steps
 1. Installs one package
@@ -298,7 +298,7 @@ sudo jamf policy -event BitLockerSearch
 ```
 #### Description
 RIP - Installs the custom application made for searching through SLU BitLocker files on macOS<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `BitLocker Search`
 #### Steps
 1. Installs one package
@@ -310,7 +310,7 @@ sudo jamf policy -event DeviceStatusCheck
 ```
 #### Description
 WIP<br />
-**Frequency:** `Ongoing` - testing group for now
+**Frequency:** `Ongoing` - testing group for now<br />
 **Self Service Name:** `Device Status Check`
 #### Steps
 1. Installs one package
@@ -322,7 +322,7 @@ sudo jamf policy -event InstallEndNote
 ```
 #### Description
 Installs EndNote 21<br /> 
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `EndNote 21`
 #### Steps
 1. Installs one package
@@ -334,7 +334,7 @@ sudo jamf policy -event InstallGlobalProtect
 ```
 #### Description
 Installs Global Protect 6.2.6<br /> 
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `Global Protect`
 #### Steps
 1. Installs one package
@@ -346,7 +346,7 @@ sudo jamf policy -event InstallSPSS29
 ```
 #### Description
 Installs IBM SPSS 29<br /> 
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `IBM SPSS 29`
 #### Steps
 1. Installs one package
@@ -358,8 +358,8 @@ sudo jamf policy -event InstallSPSS30
 ```
 #### Description
 Installs IBM SPSS 30 and automatically ties it to our licensing server<br /> 
-**Frequency:** `Ongoing`
-**Log Location:** `/var/log/set_SPSSLicense.log`
+**Frequency:** `Ongoing`<br />
+**Log Location:** `/var/log/set_SPSSLicense.log`<br />
 **Self Service Name:** `IBM SPSS 30`
 #### Steps
 1. Installs one package
@@ -373,7 +373,7 @@ sudo jamf policy -event InstallO365
 ```
 #### Description
 Installs Microsoft Office 365, includes OneDrive and Teams<br /> 
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `Microsoft Office 365`
 #### Steps
 1. Installs one package
@@ -385,7 +385,7 @@ sudo jamf policy -event InstallMitel
 ```
 #### Description
 Installs Mitel Connect<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `Mitel Connect`
 #### Steps
 1. Installs one package
@@ -397,7 +397,7 @@ sudo jamf policy -event InstallPanopto
 ```
 #### Description
 Installs Panopto. The beginning of the Panopto install package name determines the domain the application is linked to<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `Panopto`
 #### Steps
 1. Installs one package
@@ -409,7 +409,7 @@ sudo jamf policy -event InstallMFClient
 ```
 #### Description
 Installs PaperCut MF Client<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `PaperCut MF Client`
 #### Steps
 1. Installs one package
@@ -420,8 +420,8 @@ Installs PaperCut MF Client<br />
 sudo jamf policy -event InstallPrintDeployClient
 ```
 #### Description
-Installs PaperCut Print Deploy Client. Devices on Tahoe that install the Print Deploy Client will get the same policy but with upan updated driver package<br />
-**Frequency:** `Ongoing`
+Installs PaperCut Print Deploy Client. Devices on Tahoe that install the Print Deploy Client will get the same policy but with an updated driver package<br />
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `PaperCut - Print Deploy Client`
 #### Steps
 1. Installs two packages
@@ -435,7 +435,7 @@ sudo jamf policy -event InstallR
 ```
 #### Description
 Installs R 4.5.0. The device's architecture will determine which version of R 4.5.0 to install, arm64 or x86_64<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `R`
 #### Steps
 1. Installs one package
@@ -447,7 +447,7 @@ sudo jamf policy -event InstallRStudio
 ```
 #### Description
 Installs R Studio 2024.12.1+563<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `R Studio`
 #### Steps
 1. Installs one package
@@ -459,7 +459,7 @@ sudo jamf policy -event SLUFonts
 ```
 #### Description
 Installs a package of Archivo Narrow and Crimson Pro fonts as well as the SLU logo for AppleScript dialog windows<br />
-**Frequency:** `Ongoing`
+**Frequency:** `Ongoing`<br />
 **Self Service Name:** `SLU Fonts`
 #### Steps
 1. Installs two packages
