@@ -17,9 +17,9 @@ then
 fi
 
 # Authenticate
-jamfURL="https://$(security find-generic-password -s "jamf-api-url" -a "$currentUser" -w)"
-clientID=$(security find-generic-password -s "jamf-api-id" -a "$currentUser" -w)
-clientSecret=$(security find-generic-password -s "jamf-api-sec" -a "$currentUser" -w)
+jamfURL="$(security find-generic-password -s "jamf-api-url" -a "$currentUser" -w)"
+clientID="$(security find-generic-password -s "jamf-api-id" -a "$currentUser" -w)"
+clientSecret="$(security find-generic-password -s "jamf-api-sec" -a "$currentUser" -w)"
 accessToken=$(curl --silent --location \
 	--request POST "${jamfURL}/api/oauth/token" \
 	--header "Content-Type: application/x-www-form-urlencoded" \
