@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 09-06-25  ###
-### Version: 3.4       ###
+### Updated: 03-17-26  ###
+### Version: 3.5       ###
 ##########################
 
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
@@ -17,7 +17,7 @@ function log_Message() {
     local message="$1"
     local logType="${2:-Log}"
     local timestamp="$(date "+%F %T")"
-    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logFile"
+    printf "%s: %s %s\n" "$logType" "$timestamp" "$message" | tee -a "$logPath"
 }
 
 # Attempt to handle a jamf policy already being run
