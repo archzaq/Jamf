@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-01-25  ###
-### Updated: 08-05-25  ###
-### Version: 1.2       ###
+### Updated: 03-25-26  ###
+### Version: 1.3       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -575,14 +575,26 @@ function main() {
         exit 1
     fi
 
-    log_Message "Installing QuantumGRN to myqgrn conda env"
-    if conda run -n myqgrn pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "QuantumGRN";
+    log_Message "Cloning QuantumGRN repo"
+    if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
     then
-        log_Message "QuantumGRN successfully installed using pip"
+        log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
+        log_Message "Installing QuantumGRN to myqgrn conda env"
+        if conda run -n myqgrn pip install -e "${quantumGRNInstallPath}/QuantumGRN";
+        then
+            log_Message "QuantumGRN successfully installed using pip"
+        else
+            log_Message "ERROR: Unable to install QuantumGRN"
+            alert_Dialog "Unable to install QuantumGRN"
+            open "$logFile"
+            exit 1
+        fi
     else
-        log_Message "ERROR: Unable to install QuantumGRN"
-        alert_Dialog "Unable to install QuantumGRN"
+        log_Message "ERROR: Unable to clone QuantumGRN repo"
+        log_Message "Opening QuantumGRN Github link"
+        alert_Dialog "Unable to clone QuantumGRN repo, opening GitHub page"
         open "$logFile"
+        open -u -n "https://github.com/cailab-tamu/QuantumGRN"
         exit 1
     fi
 
@@ -592,16 +604,6 @@ function main() {
         log_Message "Spyder installed for myqgrn conda env"
     else
         log_Message "ERROR: Unable to install Spyder for myqgrn conda env"
-    fi
-
-    log_Message "Cloning QuantumGRN repo for example script"
-    if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
-    then
-        log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
-    else
-        log_Message "ERROR: Unable to clone QuantumGRN repo"
-        log_Message "Opening QuantumGRN Github link"
-        open -u -n "https://github.com/cailab-tamu/QuantumGRN"
     fi
 
     if [[ -d "${currentUserHomePath}/Applications/Anaconda-Navigator.app" ]];
