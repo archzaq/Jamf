@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 08-01-25  ###
 ### Updated: 03-25-26  ###
-### Version: 1.3       ###
+### Version: 1.4       ###
 ##########################
 
 readonly defaultIconPath='/usr/local/jamfconnect/SLU.icns'
@@ -273,6 +273,21 @@ function download_Tweedledum() {
             return 1
         else
             log_Message "Tweedledum version 1.1.1 present"
+            if binary_Dialog "Tweedledum 1.1.1 is already downloaded.\n\nWould you like to re-download it?" "Re-download";
+            then
+                log_Message "User chose to re-download Tweedledum"
+                rm -rf "$tweedledumInstallPath"
+                if git clone --branch v1.1.1 --depth 1 https://github.com/boschmitt/tweedledum.git "$tweedledumInstallPath";
+                then
+                    log_Message "Tweedledum 1.1.1 re-downloaded to: \"$tweedledumInstallPath\""
+                else
+                    log_Message "ERROR: Unable to re-download Tweedledum 1.1.1"
+                    alert_Dialog "Unable to re-download Tweedledum 1.1.1"
+                    return 1
+                fi
+            else
+                log_Message "User chose to keep existing Tweedledum"
+            fi
         fi
     fi
     return 0
@@ -575,26 +590,43 @@ function main() {
         exit 1
     fi
 
-    log_Message "Cloning QuantumGRN repo"
-    if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
+    log_Message "Checking for existing QuantumGRN repo"
+    if [[ -d "${quantumGRNInstallPath}/QuantumGRN" ]];
     then
-        log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
-        log_Message "Installing QuantumGRN to myqgrn conda env"
-        if conda run -n myqgrn pip install -e "${quantumGRNInstallPath}/QuantumGRN";
+        log_Message "QuantumGRN directory already exists"
+        if binary_Dialog "QuantumGRN is already downloaded.\n\nWould you like to re-download it?" "Re-download";
         then
-            log_Message "QuantumGRN successfully installed using pip"
+            log_Message "User chose to re-download QuantumGRN"
+            rm -rf "${quantumGRNInstallPath}/QuantumGRN"
         else
-            log_Message "ERROR: Unable to install QuantumGRN"
-            alert_Dialog "Unable to install QuantumGRN"
+            log_Message "User chose to keep existing QuantumGRN"
+        fi
+    fi
+
+    if [[ ! -d "${quantumGRNInstallPath}/QuantumGRN" ]];
+    then
+        log_Message "Cloning QuantumGRN repo"
+        if git clone https://github.com/cailab-tamu/QuantumGRN.git "${quantumGRNInstallPath}/QuantumGRN";
+        then
+            log_Message "QuantumGRN repo cloned to \"$quantumGRNInstallPath\""
+        else
+            log_Message "ERROR: Unable to clone QuantumGRN repo"
+            log_Message "Opening QuantumGRN Github link"
+            alert_Dialog "Unable to clone QuantumGRN repo, opening GitHub page"
             open "$logFile"
+            open -n "https://github.com/cailab-tamu/QuantumGRN"
             exit 1
         fi
+    fi
+
+    log_Message "Installing QuantumGRN to myqgrn conda env"
+    if conda run -n myqgrn pip install -e "${quantumGRNInstallPath}/QuantumGRN";
+    then
+        log_Message "QuantumGRN successfully installed using pip"
     else
-        log_Message "ERROR: Unable to clone QuantumGRN repo"
-        log_Message "Opening QuantumGRN Github link"
-        alert_Dialog "Unable to clone QuantumGRN repo, opening GitHub page"
+        log_Message "ERROR: Unable to install QuantumGRN"
+        alert_Dialog "Unable to install QuantumGRN"
         open "$logFile"
-        open -u -n "https://github.com/cailab-tamu/QuantumGRN"
         exit 1
     fi
 
@@ -611,7 +643,7 @@ function main() {
         log_Message "Opening \"${currentUserHomePath}/Applications/Anaconda-Navigator.app\""
         open "${currentUserHomePath}/Applications/Anaconda-Navigator.app"
         sleep 25
-        if ! binary_Dialog "Ensure you change the Anaconda Navigator environment!\n\nFrom: base (root)\n\nTo: myqgrn\n\nThen launch Spyder." "Done";
+        if ! binary_Dialog "Ensure you change the Anaconda Navigator environment!\n\nFrom: base (root)\n\nTo: myqgrn\n\nThen launch Spyder." "OK";
         then
             log_Message "Exiting at last dialog"
         fi
@@ -620,7 +652,7 @@ function main() {
         log_Message "Opening \"/Applications/Anaconda-Navigator.app\""
         open "/Applications/Anaconda-Navigator.app"
         sleep 25
-        if ! binary_Dialog "Ensure you change the Anaconda Navigator environment!\n\nFrom: base (root)\n\nTo: myqgrn\n\nThen launch Spyder." "Done";
+        if ! binary_Dialog "Ensure you change the Anaconda Navigator environment!\n\nFrom: base (root)\n\nTo: myqgrn\n\nThen launch Spyder." "OK";
         then
             log_Message "Exiting at last dialog"
         fi
