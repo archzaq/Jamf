@@ -49,12 +49,7 @@ function check_Uninstall() {
 
 # Check for Cortex application
 function app_Check(){
-    if [[ -d "$cortexApplicationPath" ]];
-    then
-        return 0
-    else
-        return 1
-    fi
+    [[ -d "$cortexApplicationPath" ]]
 }
 
 function clean_Env() {
@@ -72,11 +67,11 @@ function main() {
 
     if [[ -z "$pw" ]];
     then
-        log_Message "Argument not provided" "ERROR"
+        log_Message "PW not provided" "ERROR"
         exit 1
     fi
 
-    if [[ ! -d "$cortexApplicationPath" ]];
+    if ! app_Check;
     then
         log_Message "Unable to locate: ${cortexApplicationPath}"
     else

@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 03-19-26  ###
 ### Updated: 03-31-26  ###
-### Version: 1.2       ###
+### Version: 1.3       ###
 ##########################
 
 pw="$4"
@@ -38,12 +38,7 @@ function log_Message() {
 
 # Check for Cortex application
 function app_Check(){
-    if [[ -d "$cortexApplicationPath" ]];
-    then
-        return 0
-    else
-        return 1
-    fi
+    [[ -d "$cortexApplicationPath" ]]
 }
 
 # Check for cytool, check-in if available
@@ -84,6 +79,11 @@ function main() {
     if [[ -z "$pw" ]] || [[ -z "$jamfTrigger" ]] || [[ -z "$jamfFallbackTrigger" ]] || [[ -z "$jamfInstallVersion" ]] || [[ -z "$jamfFallbackVersion" ]];
     then
         log_Message "Arguments not provided" "ERROR"
+        [[ -n "$pw" ]] || log_Message "Missing PW"
+        [[ -n "$jamfTrigger" ]] || log_Message "Missing Cortex Trigger"
+        [[ -n "$jamfFallbackTrigger" ]] || log_Message "Missing Cortex Fallback Trigger"
+        [[ -n "$jamfInstallVersion" ]] || log_Message "Missing Cortex Version"
+        [[ -n "$jamfFallbackVersion" ]] || log_Message "Missing Cortex Fallback Version"
         exit 1
     fi
 
@@ -94,7 +94,7 @@ function main() {
         log_Message "Unable to locate: ${cortexApplicationPath}"
     else
         log_Message "Application present: ${cortexApplicationPath}"
-        echo "$pw" | sudo -S "$cytoolPath" security_modules disable self_prot;
+        echo "$pw" | sudo -S "$cytoolPath" security_modules disable self_prot
         log_Message "Attempted to disable SelfProt"
     fi
     
