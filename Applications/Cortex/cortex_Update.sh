@@ -3,25 +3,25 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 03-19-26  ###
-### Updated: 03-19-26  ###
-### Version: 1.0       ###
+### Updated: 03-31-26  ###
+### Version: 1.2       ###
 ##########################
 
 pw="$4"
-readonly jamfInstall="$5"
-readonly jamfFallbackInstall="$6"
+readonly jamfTrigger="$5"
+readonly jamfFallbackTrigger="$6"
+readonly jamfInstallVersion="$7"
+readonly jamfFallbackVersion="$8"
 readonly appName='Cortex XDR'
-readonly oldAppName='Traps'
-readonly appNameVersion="${appName} 9.1"
-readonly appNameFallbackVersion="${appName} 8.8"
+readonly appNameVersion="${appName} ${jamfInstallVersion}"
+readonly appNameFallbackVersion="${appName} ${jamfFallbackVersion}"
 readonly cortexApplicationPath='/Applications/Cortex XDR.app'
 readonly cortexLibraryPath='/Library/Application Support/PaloAltoNetworks/Traps/bin'
 readonly cortexUninstallerTool="${cortexLibraryPath}/cortex_xdr_uninstaller_tool"
 readonly trapsUninstallerTool="${cortexLibraryPath}/traps_uninstaller_tool"
 readonly cytoolPath="${cortexLibraryPath}/cytool"
-readonly uninstallWait=5
 readonly installWait=10
-readonly logFile='/var/log/cortex_Upgrade-9.1.log'
+readonly logFile="/var/log/cortex_Update-${jamfInstallVersion}.log"
 
 # Append current status to log file
 function log_Message() {
@@ -36,24 +36,14 @@ function log_Message() {
 	fi
 }
 
-# Check for Cortex uninstaller, if found, run uninstaller
-function check_Uninstall() {
-    local path="$1"
-    local name="$2"
-    if [[ -f "$path" ]];
+# Check for Cortex application
+function app_Check(){
+    if [[ -d "$cortexApplicationPath" ]];
     then
-        log_Message "Uninstaller found: ${path}"
-        if "$path" "$pw" &>/dev/null;
-        then
-            log_Message "Successfully uninstalled: ${name}"
-        else
-            log_Message "Unable to uninstall: ${name}" "ERROR"
-            return 1
-        fi
+        return 0
     else
-        log_Message "Unable to locate: \"${name}\"" "WARN"
+        return 1
     fi
-    return 0
 }
 
 # Check for cytool, check-in if available
@@ -79,16 +69,7 @@ function cytool_Checkin() {
     fi
 }
 
-# Check for Cortex application
-function app_Check(){
-    if [[ -d "$cortexApplicationPath" ]];
-    then
-        return 0
-    else
-        return 1
-    fi
-}
-
+# Set pw to random chars and then unset pw
 function clean_Env() {
     if [[ -n "$pw" ]];
     then
@@ -100,7 +81,7 @@ function clean_Env() {
 function main() {
     trap "clean_Env" EXIT INT TERM HUP
 
-    if [[ -z "$pw" ]] || [[ -z "$jamfInstall" ]] || [[ -z "$jamfFallbackInstall" ]];
+    if [[ -z "$pw" ]] || [[ -z "$jamfTrigger" ]] || [[ -z "$jamfFallbackTrigger" ]] || [[ -z "$jamfInstallVersion" ]] || [[ -z "$jamfFallbackVersion" ]];
     then
         log_Message "Arguments not provided" "ERROR"
         exit 1
@@ -108,25 +89,17 @@ function main() {
 
     printf "Log: $(date "+%F %T") Beginning ${appNameVersion} Upgrade script\n" | tee "$logFile"
 
-    if [[ ! -d "$cortexApplicationPath" ]];
+    if ! app_Check; 
     then
         log_Message "Unable to locate: ${cortexApplicationPath}"
     else
         log_Message "Application present: ${cortexApplicationPath}"
-        if [[ ! -f "$cortexUninstallerTool" ]] && [[ ! -f "$trapsUninstallerTool" ]];
-        then
-            log_Message "Unable to locate \"${cortexUninstallerTool}\" or \"${trapsUninstallerTool}\"" "WARN"
-        fi
-        if echo "$pw" | sudo -S "$cytoolPath" self_prot disable;
-        then
-            log_Message "SelfProt disabled successful"
-        else
-            log_Message "Unable to disable SelfProt" "WARN"
-        fi
+        echo "$pw" | sudo -S "$cytoolPath" security_modules disable self_prot;
+        log_Message "Attempted to disable SelfProt"
     fi
     
     log_Message "Installing ${appNameVersion}"
-    if /usr/local/bin/jamf policy -event "$jamfInstall" &>/dev/null;
+    if /usr/local/bin/jamf policy -event "$jamfTrigger" &>/dev/null;
     then
         log_Message "Successfully installed: ${appNameVersion}"
         sleep $installWait
@@ -135,7 +108,7 @@ function main() {
             log_Message "Application present: ${cortexApplicationPath}"
         else
             log_Message "Unable to locate: ${cortexApplicationPath}" "ERROR"
-            if /usr/local/bin/jamf policy -event "$jamfFallbackInstall" &>/dev/null;
+            if /usr/local/bin/jamf policy -event "$jamfFallbackTrigger" &>/dev/null;
             then
                 log_Message "Successfully installed: ${appNameFallbackVersion}"
             else
@@ -145,7 +118,7 @@ function main() {
         fi
     else
         log_Message "Unable to install: ${appNameVersion}" "ERROR"
-        if /usr/local/bin/jamf policy -event "$jamfFallbackInstall" &>/dev/null;
+        if /usr/local/bin/jamf policy -event "$jamfFallbackTrigger" &>/dev/null;
         then
             log_Message "Successfully installed: ${appNameFallbackVersion}"
         else

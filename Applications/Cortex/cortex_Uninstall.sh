@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 03-19-26  ###
-### Updated: 03-19-26  ###
-### Version: 1.0       ###
+### Updated: 03-31-26  ###
+### Version: 1.4       ###
 ##########################
 
 pw="$4"
@@ -38,15 +38,11 @@ function check_Uninstall() {
     if [[ -f "$path" ]];
     then
         log_Message "Uninstaller found: ${path}"
-        if "$path" "$pw" &>/dev/null;
-        then
-            log_Message "Successfully uninstalled: ${name}"
-        else
-            log_Message "Unable to uninstall: ${name}" "ERROR"
-            return 1
-        fi
+        echo "$pw" | sudo -S "$path"
+        log_Message "Attempted uninstall"
     else
         log_Message "Unable to locate: \"${name}\"" "WARN"
+        return 1
     fi
     return 0
 }
@@ -72,12 +68,7 @@ function clean_Env() {
 function main() {
     trap "clean_Env" EXIT INT TERM HUP
 
-    if [[ -w "$logFile" ]];
-    then
-        printf "Log: $(date "+%F %T") Beginning Cortex Uninstall script\n" | tee "$logFile"
-    else
-        printf "Log: $(date "+%F %T") Beginning Cortex Uninstall script\n"
-    fi
+    printf "Log: $(date "+%F %T") Beginning Cortex Uninstall script\n" | tee "$logFile"
 
     if [[ -z "$pw" ]];
     then
@@ -104,21 +95,19 @@ function main() {
 
         if ! check_Uninstall "$cortexUninstallerTool" "$appName";
         then
-            log_Message "Exiting at ${appName} uninstall" "ERROR"
-            exit 1
+            log_Message "Skipping ${appName} uninstall" "WARN"
         fi
 
         if ! check_Uninstall "$trapsUninstallerTool" "$oldAppName";
         then
-            log_Message "Exiting at ${oldAppName} uninstall" "ERROR"
-            exit 1
+            log_Message "Skipping ${oldAppName} uninstall" "WARN"
         fi
 
         sleep $uninstallWait
 
         if app_Check;
         then
-            log_Message "Application present: ${cortexApplicationPath}"
+            log_Message "Application still present: ${cortexApplicationPath}"
             exit 1
         else
             log_Message "Successfully removed: ${cortexApplicationPath}"
