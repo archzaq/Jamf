@@ -64,26 +64,32 @@ function update_PlistValue_ToFalse() {
 function bootout_LaunchAgent() {
     local serviceLabel="$1"
     local currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk '/Name :/ { print $3 }')"
+
     if [[ -z "$currentUser" || "$currentUser" == "loginwindow" ]];
     then
         log_Message "No console user logged in, skipping bootout of ${serviceLabel}"
         return 0
     fi
+
     local consoleUID="$(/usr/bin/id -u "$currentUser")"
     if [[ -z "$consoleUID" ]];
     then
         log_Message "Unable to get UID for console user ${currentUser}" "WARN"
         return 1
     fi
+
     local serviceTarget="gui/${consoleUID}/${serviceLabel}"
     if ! /bin/launchctl print "$serviceTarget" &>/dev/null;
     then
         log_Message "${serviceLabel} not loaded in ${serviceTarget}, nothing to bootout"
         return 0
     fi
+
     log_Message "Booting out ${serviceTarget}"
     /bin/launchctl bootout "$serviceTarget"
+
     sleep 2
+
     if /bin/launchctl print "$serviceTarget" &>/dev/null;
     then
         log_Message "Failed to bootout ${serviceLabel}" "WARN"
