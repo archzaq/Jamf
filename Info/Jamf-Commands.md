@@ -377,7 +377,7 @@ Installs IBM SPSS 30 and automatically ties it to our licensing server<br />
 #### Steps
 1. Installs one package
 	- SPSS 30
-2. [`Set SPSS License`](https://github.com/archzaq/Jamf/blob/main/Applications/SPSS/set_SPSSLicense.sh)
+2. [`Set SPSS License`](https://github.com/archzaq/Jamf/blob/main/Applications/SPSS/set_SPSS30License.sh)
 
 ## Microsoft Office 365
 ```bash
