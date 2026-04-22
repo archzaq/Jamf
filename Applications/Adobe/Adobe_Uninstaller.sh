@@ -2,9 +2,9 @@
 
 ############################
 ###  Author:  Zac Reeves ###
-###  Created: 00-00-00   ###
+###  Created: 05-29-24   ###
 ###  Updated: 04-22-26   ###
-###  Version: 0.2        ###
+###  Version: 1.5        ###
 ############################
 
 readonly scriptName='uninstall_Adobe'
@@ -14,16 +14,6 @@ readonly dialogTitle='SLU ITS - Adobe Uninstall'
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 activeIcon="$SLUIconFile"
-
-# Bundle IDs we care about for mdfind discovery
-readonly acrobatBundleIDs=('com.adobe.Acrobat.Pro' 'com.adobe.Acrobat' 'com.adobe.Acrobat.reader')
-readonly readerBundleIDs=('com.adobe.Reader' 'com.adobe.AdobeReader')
-readonly ccBundleIDs=('com.adobe.acc.AdobeCreativeCloud' 'com.adobe.CCXProcess' 'com.adobe.accmac')
-
-# Fallback paths if Spotlight comes up empty
-readonly acrobatPathGlobs=('/Applications/Adobe Acrobat'*)
-readonly readerPathGlobs=('/Applications/Adobe Reader'*)
-readonly ccPathGlobs=('/Applications/Adobe Creative Cloud'* '/Applications/Utilities/Adobe Creative Cloud'*)
 
 # Append current status to log file
 function log_Message() {
@@ -78,83 +68,101 @@ function check_Icon() {
     return 0
 }
 
-# Find installed app paths for a set of bundle IDs, with path-glob fallback
-function find_AppPaths() {
-    local -n bundleIDs=$1
-    local -n fallbackGlobs=$2
-    local -a foundPaths=()
-    local bundleID path
+# Detect whether a product is installed via Spotlight (diagnostic only)
+function detect_Installed() {
+    local productLabel="$1"
+    shift
+    local bundleID path foundSomething=0
 
-    # Spotlight by bundle ID
-    for bundleID in "${bundleIDs[@]}";
+    for bundleID in "$@";
     do
         while IFS= read -r path;
         do
-            [[ -n "$path" && -e "$path" ]] && foundPaths+=("$path")
+            [[ -n "$path" && -e "$path" ]] || continue
+            log_Message "Detected ${productLabel} at: $path"
+            foundSomething=1
         done < <(/usr/bin/mdfind "kMDItemCFBundleIdentifier == '$bundleID'" 2>/dev/null)
     done
 
-    # Direct path globs 
-    if [[ ${#foundPaths[@]} -eq 0 ]];
+    if [[ $foundSomething -eq 0 ]];
     then
-        for path in "${fallbackGlobs[@]}";
-        do
-            [[ -e "$path" ]] && foundPaths+=("$path")
-        done
+        log_Message "No ${productLabel} installs detected by Spotlight"
     fi
-
-    printf '%s\n' "${foundPaths[@]}"
 }
 
-# Remove shared Adobe support files (Acrobat and Reader both drop these)
+# Remove a path with a log line if it exists
+function remove_IfExists() {
+    local target="$1"
+    if [[ -e "$target" ]];
+    then
+        log_Message "Removing: $target"
+        rm -rf "$target"
+    fi
+}
+
+# Remove shared Adobe support files (both Acrobat and Reader drop these)
 function remove_SharedAdobeSupport() {
-    rm -rf "/Library/Application Support/Adobe/Acrobat"*
-    rm -rf "/Library/Internet Plug-Ins/Adobe"*
-    rm -rf "/Applications/Utilities/Adobe Sync"
-    rm -rf "/Applications/Utilities/Adobe Application"
-    rm -rf "/Applications/Utilities/Adobe Installers"
-    rm -rf "/Applications/Utilities/Adobe Application Manager"
-    rm -rf "/Applications/Utilities/Adobe Genuine Service"
+    local sharedPaths=(
+        "/Library/Application Support/Adobe/Acrobat"*
+        "/Library/Internet Plug-Ins/Adobe"*
+        "/Applications/Utilities/Adobe Sync"
+        "/Applications/Utilities/Adobe Application"
+        "/Applications/Utilities/Adobe Installers"
+        "/Applications/Utilities/Adobe Application Manager"
+        "/Applications/Utilities/Adobe Genuine Service"
+    )
+    local path
+    for path in "${sharedPaths[@]}";
+    do
+        remove_IfExists "$path"
+    done
 }
 
 # Uninstall Adobe Acrobat
 function uninstall_Acrobat() {
+    detect_Installed "Adobe Acrobat" 'com.adobe.Acrobat.Pro' 'com.adobe.Acrobat' 'com.adobe.Acrobat.reader'
+    local acrobatPaths=(
+        "/Applications/Adobe Acrobat"*
+    )
     local path
-    while IFS= read -r path;
+    for path in "${acrobatPaths[@]}";
     do
-        [[ -n "$path" ]] || continue
-        log_Message "Removing: $path"
-        rm -rf "$path"
-    done < <(find_AppPaths acrobatBundleIDs acrobatPathGlobs)
+        remove_IfExists "$path"
+    done
     remove_SharedAdobeSupport
     log_Message "Uninstalled Adobe Acrobat"
 }
 
 # Uninstall Adobe Reader
 function uninstall_Reader() {
+    detect_Installed "Adobe Reader" 'com.adobe.Reader' 'com.adobe.AdobeReader'
+    local readerPaths=(
+        "/Applications/Adobe Reader"*
+        "/Library/Application Support/Adobe/Adobe Reader"*
+    )
     local path
-    while IFS= read -r path;
+    for path in "${readerPaths[@]}";
     do
-        [[ -n "$path" ]] || continue
-        log_Message "Removing: $path"
-        rm -rf "$path"
-    done < <(find_AppPaths readerBundleIDs readerPathGlobs)
-    rm -rf "/Library/Application Support/Adobe/Adobe Reader"*
+        remove_IfExists "$path"
+    done
     remove_SharedAdobeSupport
     log_Message "Uninstalled Adobe Reader"
 }
 
 # Uninstall Creative Cloud
 function uninstall_CC() {
+    detect_Installed "Adobe Creative Cloud" 'com.adobe.acc.AdobeCreativeCloud' 'com.adobe.CCXProcess' 'com.adobe.accmac'
+    local ccPaths=(
+        "/Applications/Adobe Creative Cloud"*
+        "/Applications/Utilities/Adobe Creative Cloud"*
+        "/Library/Application Support/Adobe/Creative Cloud"*
+        "/Applications/Utilities/Adobe Creative Cloud Experience"
+    )
     local path
-    while IFS= read -r path;
+    for path in "${ccPaths[@]}";
     do
-        [[ -n "$path" ]] || continue
-        log_Message "Removing: $path"
-        rm -rf "$path"
-    done < <(find_AppPaths ccBundleIDs ccPathGlobs)
-    rm -rf "/Library/Application Support/Adobe/Creative Cloud"*
-    rm -rf "/Applications/Utilities/Adobe Creative Cloud Experience"
+        remove_IfExists "$path"
+    done
     log_Message "Uninstalled Adobe Creative Cloud"
 }
 
@@ -204,7 +212,7 @@ OOP
 
 # Prompt once up front before doing anything destructive
 function prompt_UserConsent() {
-    local promptText="You are about to receive the latest version of Adobe Acrobat DC Pro.\n\nAll Adobe applications will be closed. Adobe Acrobat, Reader, and Creative Cloud will be uninstalled.\n\nSelect \"Continue\" to begin.\n\n\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000."
+    local promptText='All Adobe applications will be closed. Adobe Acrobat, Reader, and Creative Cloud will be uninstalled.\n\nSelect \"Continue\" to begin.\n\nIf you have any questions or concerns, please contact the IT Service Desk at (314)-977-4000.'
     if binary_Dialog "$promptText" "Continue";
     then
         log_Message "User consented to uninstall"
