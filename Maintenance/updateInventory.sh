@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-12-23  ###
-### Updated: 03-17-26  ###
-### Version: 3.5       ###
+### Updated: 05-29-26  ###
+### Version: 3.6       ###
 ##########################
 
 readonly jamfConnectPLIST='/Library/Managed Preferences/com.jamf.connect.plist'
@@ -134,14 +134,15 @@ function main() {
     log_Message "Checking for Jamf Connect"
     if [[ ! -d "$jamfConnectApp" ]] || [[ ! -f "$jamfConnectPLIST" ]];
     then
-        log_Message "Missing Jamf Connect, attempting install"
-        if /usr/local/bin/jamf policy -event MissingJamfConnect;
-        then
-            log_Message "Jamf Connect policy finished"
-        else
-            log_Message "Unable to complete Jamf Connect policy" "ERROR"
-            /usr/bin/osascript -e 'display alert "An error has occurred!" message "You must install Jamf Connect to authenticate properly at login" as critical'
-        fi
+        log_Message "Missing Jamf Connect, check install"
+        # Commented out until we change the detection method
+        #if /usr/local/bin/jamf policy -event MissingJamfConnect;
+        #then
+        #    log_Message "Jamf Connect policy finished"
+        #else
+        #    log_Message "Unable to complete Jamf Connect policy" "ERROR"
+        #    /usr/bin/osascript -e 'display alert "An error has occurred!" message "You must install Jamf Connect to authenticate properly at login" as critical'
+        #fi
     else
         log_Message "Jamf Connect already installed"
     fi
