@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 06-28-23  ###
-### Updated: 07-30-25  ###
-### Version: 3.1       ###
+### Updated: 06-18-26  ###
+### Version: 3.3       ###
 ##########################
 
 readonly currentName=$(/usr/sbin/scutil --get LocalHostName)
@@ -113,7 +113,7 @@ function department_Prompt() {
     "MED - Medical School", "MM - Mission & Ministry", "MMI - Molecular Microbiology and Immunology", "MCL - Language Literature and Cultures",\
     "MCS - Math and Mathematical Computer Science", "MOC - Museum of Contemporary Religious Art", "NEU - Neurology", "PATH - Pathology",\
     "PAR - Parks College", "PEDS - Pediatrics", "PHARM - Pharmacology and Physiology","PHY - Philosophy", "PHYS - Physics",\
-    "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology",\
+    "POL - Political Science", "PO - President's Office", "PP - Prison Program", "PVST - Provost", "PSY - Psychology", "PSYCH - Psychiatry",\
     "REG - Office of the Registrar", "RES - Research Admin", "SCJ - Sociology and Anthropology", "SLUCOR - SLU Center of Outcomes Research",\
     "SOE - School of Education", "SON - School of Nursing", "SPH - School of Public Health", "SPS - School of Professional Studies",\
     "SDEV - Student Development", "SW - Social Work", "THE - Theological Studies", "WMS - Women’s Studies Program"} \
@@ -317,4 +317,3 @@ function main() {
 }
 
 main
-
