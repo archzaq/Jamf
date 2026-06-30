@@ -4,10 +4,10 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 06-20-26   ###
 ###  Updated: 06-30-26   ###
-###  Version: 1.0        ###
+###  Version: 1.1        ###
 ############################
 
-readonly token="$4"
+token="$4"
 readonly scriptName='uninstall_Cyberark'
 readonly logFile="/var/log/${scriptName}.log"
 readonly cyberarkPath='/Applications/CyberArk EPM.app'
@@ -27,7 +27,13 @@ function log_Message() {
 	fi
 }
 
+function clear_token() {
+    token=$(head -c ${#token} /dev/zero | tr '\0' 'x')
+    unset token
+}
+
 function main() {
+    trap "clear_token" EXIT INT TERM HUP
 	printf "Log: $(date "+%F %T") Beginning ${scriptName} script\n" | tee "$logFile"
 
     [[ -z "$token" ]] && { log_Message "No token provided" "ERROR"; exit 1; }
@@ -38,13 +44,16 @@ function main() {
         if [[ -e "$cyberarkUninstaller" ]];
         then
             "$cyberarkUninstaller" -token "$token" || { log_Message "Uninstaller failed!" "ERROR"; exit 1; }
+            clear_token
             log_Message "Successfully uninstalled CyberArk!"
         elif [[ -e "$cyberarkUninstallHelper" ]];
         then
             "$cyberarkUninstallHelper" -token "$token" || { log_Message "Uninstaller failed!" "ERROR"; exit 1; }
+            clear_token
             log_Message "Successfully uninstalled CyberArk!"
         else
             log_Message "No uninstaller present! Check ${cyberarkPath} and try again, or manually run the uninstaller" "ERROR"
+            clear_token
             exit 1
         fi
 
@@ -57,6 +66,7 @@ function main() {
         fi
     else
         log_Message "CyberArk not found, exiting" "WARN"
+        clear_token
     fi
 
     exit 0
