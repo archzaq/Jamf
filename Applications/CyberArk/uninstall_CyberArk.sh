@@ -38,11 +38,11 @@ function main() {
         if [[ -e "$cyberarkUninstaller" ]];
         then
             "$cyberarkUninstaller" -token "$token" || { log_Message "Uninstaller failed!" "ERROR"; exit 1; }
-            log_Message "Successfully uninstalled CyberArk!" 
+            log_Message "Successfully uninstalled CyberArk!"
         elif [[ -e "$cyberarkUninstallHelper" ]];
         then
             "$cyberarkUninstallHelper" -token "$token" || { log_Message "Uninstaller failed!" "ERROR"; exit 1; }
-            log_Message "Successfully uninstalled CyberArk!" 
+            log_Message "Successfully uninstalled CyberArk!"
         else
             log_Message "No uninstaller present! Check ${cyberarkPath} and try again, or manually run the uninstaller" "ERROR"
             exit 1
