@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 07-13-26  ###
-### Updated: 07-15-26  ###
-### Version: 0.2       ###
+### Updated: 08-03-26  ###
+### Version: 0.3       ###
 ##########################
 
 pw="$4"
@@ -194,7 +194,9 @@ function main() {
             exit 1
         fi
         log_Message "${appName} installed successfully"
-    elif ! version_Check;
+    fi
+
+    if ! version_Check;
     then
         log_Message "Installed version does not match target, reinstalling" "WARN"
         if ! install_App;
