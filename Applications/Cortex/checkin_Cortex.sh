@@ -4,7 +4,7 @@
 ### Author: Zac Reeves ###
 ### Created: 07-13-26  ###
 ### Updated: 08-03-26  ###
-### Version: 0.3       ###
+### Version: 0.4       ###
 ##########################
 
 pw="$4"
@@ -194,11 +194,13 @@ function main() {
             exit 1
         fi
         log_Message "${appName} installed successfully"
+    else
+        log_Message "Application present: ${cortexApplicationPath}"
     fi
 
     if ! version_Check;
     then
-        log_Message "Installed version does not match target, reinstalling" "WARN"
+        log_Message "Installed version does not match target, attempting reinstall" "WARN"
         if ! install_App;
         then
             log_Message "${appName} failed to update" "ERROR"
@@ -206,7 +208,7 @@ function main() {
         fi
         log_Message "${appName} updated successfully"
     else
-        log_Message "Application present: ${cortexApplicationPath}"
+        log_Message "${appName} is the correct version: ${jamfInstallVersion}"
     fi
 
     # app is present, confirm its checking in
