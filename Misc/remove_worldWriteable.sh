@@ -3,10 +3,12 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 03-25-26   ###
-###  Updated: 03-25-26   ###
-###  Version: 0.1        ###
+###  Updated: 08-27-26   ###
+###  Version: 0.2        ###
 ############################
 
+readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
+readonly currentUserHomePath="${HOME:-/Users/${currentUser}}"
 readonly logFile='/var/log/remove_worldWriteable.log'
 
 # Append current status to log file
@@ -25,39 +27,16 @@ function log_Message() {
 function main() {
 	if [[ -w "$logFile" ]];
 	then
-		printf "Log: $(date "+%F %T") Beginning Remove World Writeable script\n" | tee "$logFile"
+		printf "Log: $(date "+%F %T") Beginning Remove World Writable script\n" | tee "$logFile"
 	else
-		printf "Log: $(date "+%F %T") Beginning Remove World Writeable script\n"
+		printf "Log: $(date "+%F %T") Beginning Remove World Writable script\n"
 	fi
 
-    # PaperCut Client
-    if [[ -d "/Applications/PCClient.app" ]];
-    then
-        chmod -R o-w "/Applications/PCClient.app"
-    fi
+    # Find "World Writable" files and log them
+	find "${currentUserHomePath}" -type f -perm -0002 -print0 | xargs -0 -I{} echo "World-writable: {}" >> "${logFile}"
 
-    # PaperCut Print Deploy Client
-    if [[ -d "/Applications/PaperCut Print Deploy Client" ]];
-    then
-        chmod -R o-w "/Applications/PaperCut Print Deploy Client"
-    fi
-
-    # PaperCut LaunchAgent
-    if [[ -f "/Library/LaunchAgents/com.papercut.client.plist" ]];
-    then
-        chmod o-w "/Library/LaunchAgents/com.papercut.client.plist"
-    fi
-
-    # Adobe system level
-    chmod -R o-w "/Library/Application Support/Adobe/"
-    chmod o-w "/Library/Logs/adobegc.log"
-    chmod o-w "/Library/Logs/CreativeCloud/ACC/ACC.log"
-    chmod -R o-w "/Library/Logs/Adobe/"
-    chmod o-w "/Library/Preferences/com.adobe.AdobeGenuineService.plist"
-
-    # Adobe user level
-    chmod -R o-w "/Users/Shared/Adobe*"
-    chmod -R o-w "/Users/Shared/AdobeGC*"
+    # Remove "World Writable" permission from file
+	find "${currentUserHomePath}" -type f -perm -0002 -exec chmod o-w {} +
 
     exit 0
 }
