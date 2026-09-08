@@ -1,0 +1,9 @@
+#!/usr/bin/expect -f
+set timeout 10
+set password [lindex $argv 0]
+set host [lindex $argv 1]
+
+spawn ssh-copy-id -o StrictHostKeyChecking=accept-new its_admin@$host
+expect "Password:"
+send "$password\r"
+expect eof
