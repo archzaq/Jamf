@@ -1,9 +1,18 @@
 #!/usr/bin/expect -f
 set timeout 10
-set password [lindex $argv 0]
-set host [lindex $argv 1]
+set user [lindex $argv 0]
+set password [lindex $argv 1]
+set host [lindex $argv 2]
 
-spawn ssh-copy-id -o StrictHostKeyChecking=accept-new USERNAME@$host
-expect "Password:"
-send "$password\r"
+spawn sh -c "cat /path/to/key.pub | ssh -i /path/to/key -o IdentitiesOnly=yes $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
+
+expect {
+    "Are you sure you want to continue connecting (yes/no/\[fingerprint\])?" {
+        send "yes\r"
+        exp_continue
+    }
+    "Password:" {
+        send "$password\r"
+    }
+}
 expect eof

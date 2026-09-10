@@ -2,9 +2,9 @@
 
 ############################
 ###  Author:  Zac Reeves ###
-###  Created: 00-00-00   ###
-###  Updated: 00-00-00   ###
-###  Version: 0.1        ###
+###  Created: 09-09-26   ###
+###  Updated: 09-10-26   ###
+###  Version: 1.0        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -12,6 +12,7 @@ readonly logFile="/var/log/${scriptName}.log"
 readonly localAdmin=''
 readonly pass=''
 readonly csvFile='test.csv'
+readonly scriptDir="$(cd "$(dirname "$0")" && pwd)"
 
 # Append current status to log file
 function log_Message() {
@@ -47,19 +48,31 @@ function check_Connection() {
 function main() {
 	printf "Log: $(date "+%F %T") Beginning ${scriptName} script\n" | tee "$logFile"
 
-    while IFS=, read -r computerName ip
+    while IFS=, read -r -u 3 computerName ip 
     do
-        [[ "$computerName" == "Computer Name"* ]] && continue
-
+        [[ "$computerName" == *"Computer Name"* ]] && continue
         if ! check_Connection "$computerName";
         then
-            log_Message "Unable to contact ${computerName} at ${ip}" "ERROR"
-            exit 1
+            log_Message "Unable to contact ${computerName} by hostname, trying by IP" "ERROR"
+            if ! check_Connection "$ip";
+            then
+                log_Message "Unable to contact ${computerName} at ${ip}, skipping" "ERROR"
+                continue
+            else
+                computerConnection="${ip%$'\r'}"
+            fi
+        else
+            computerConnection="${computerName%$'\r'}"
         fi
 
+        "${scriptDir}/setup_Expect.expect" "$localAdmin" "$pass" "$computerConnection"
 
+        sleep 1
 
-    done < "$csvFile"
+        { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
+            | ssh -i "/Users/arch/.ssh/mdmrenew" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" "sudo -S -p '' bash -s"
+
+    done 3< "$csvFile"
 
     exit 0
 }
