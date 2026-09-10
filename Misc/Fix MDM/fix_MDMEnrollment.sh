@@ -13,13 +13,15 @@ readonly localAdmin=''
 readonly pass=''
 readonly csvFile='test.csv'
 readonly scriptDir="$(cd "$(dirname "$0")" && pwd)"
+readonly remoteScriptPath='/tmp/remote_Fix_MDMEnrollment.sh'
+readonly remoteLogPath='/tmp/remote_Fix_MDMEnrollment.out'
 
 # Append current status to log file
 function log_Message() {
 	local message="$1"
 	local type="${2:-Log}"
 	local timestamp="$(date "+%F %T")"
-	if [[ -f "$logFile" ]];
+	if [[ -w "$logFile" ]];
 	then
 		printf "%s: %s %s\n" "$type" "$timestamp" "$message" | tee -a "$logFile"
 	else
@@ -46,7 +48,8 @@ function check_Connection() {
 }
 
 function main() {
-	printf "Log: $(date "+%F %T") Beginning ${scriptName} script\n" | tee "$logFile"
+	: > "$logFile" 2>/dev/null
+	log_Message "Beginning ${scriptName} script"
 
     while IFS=, read -r -u 3 computerName ip 
     do
@@ -69,8 +72,14 @@ function main() {
 
         sleep 1
 
-        { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
-            | ssh -i "/Users/arch/.ssh/mdmrenew" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" "sudo -S -p '' bash -s"
+        if { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
+            | ssh -i "/Users/arch/.ssh/mdmrenew" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" \
+                "sudo -S -p '' /bin/bash -c 'cat > ${remoteScriptPath} && chmod 700 ${remoteScriptPath} && { nohup ${remoteScriptPath} >${remoteLogPath} 2>&1 </dev/null & }'";
+        then
+            log_Message "Enrollment script launched on ${computerConnection}"
+        else
+            log_Message "Failed to launch enrollment script on ${computerConnection}" "ERROR"
+        fi
 
     done 3< "$csvFile"
 
