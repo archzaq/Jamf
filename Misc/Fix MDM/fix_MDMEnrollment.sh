@@ -47,6 +47,7 @@ Required Arguments:
 EOF
 }
 
+# Ensure all critial arguments are provided
 function check_Arguments() {
     if [[ -z "$localAdmin" ]] || [[ -z "$pass" ]] || [[ -z "$csvFile" ]] || [[ -z "$sshKey" ]];
     then
@@ -60,6 +61,7 @@ function check_Arguments() {
     fi
 }
 
+# Ping a device
 function check_Connection() {
     local computer="$1"
     ping -c 1 -W 2 "$computer" >/dev/null 2>&1
