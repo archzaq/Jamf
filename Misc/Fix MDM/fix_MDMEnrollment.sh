@@ -3,18 +3,20 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
-###  Updated: 09-10-26   ###
-###  Version: 1.0        ###
+###  Updated: 09-11-26   ###
+###  Version: 1.1        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
-readonly logFile="/var/log/${scriptName}.log"
-readonly localAdmin=''
-readonly pass=''
-readonly csvFile='test.csv'
+readonly logFile="${HOME}/Desktop/${scriptName}.log"
 readonly scriptDir="$(cd "$(dirname "$0")" && pwd)"
 readonly remoteScriptPath='/tmp/remote_Fix_MDMEnrollment.sh'
 readonly remoteLogPath='/tmp/remote_Fix_MDMEnrollment.out'
+readonly localAdmin="$1"
+readonly pass="$2"
+readonly csvFile="$3"
+readonly sshKey="$4"
+readonly sshKeyPUBLIC="${sshKey}.pub"
 
 # Append current status to log file
 function log_Message() {
@@ -27,6 +29,35 @@ function log_Message() {
 	else
 		printf "%s: %s %s\n" "$type" "$timestamp" "$message"
 	fi
+}
+
+# Info on how to run the script
+function print_Usage() {
+    cat <<EOF
+Usage:
+  bash $(basename "$0") [options]
+
+Required Arguments:
+  '$1'                  Local Admin Account Name
+  '$2'                  Local Admin Account Pass 
+  '$3'                  Local CSV file
+  '$4'                  SSH key path
+
+  bash $(basename "$0") "accountName" "accountPass" "csvFile" "sshKey"
+EOF
+}
+
+function check_Arguments() {
+    if [[ -z "$localAdmin" ]] | [[ -z "$pass" ]] | [[ -z "$csvFile" ]] | [[ -z "$sshKey" ]];
+    then
+        log_Message "Missing argument(s)" "ERROR"
+        [[ -n "$localAdmin" ]] || log_Message "Missing Local Admin account name"
+        [[ -n "$pass" ]] || log_Message "Missing Local Admin pass"
+        [[ -n "$csvFile" ]] || log_Message "Missing path to CSV with device names"
+        [[ -n "$sshKey" ]] || log_Message "Missing path to SSH key"
+        print_Usage
+        exit 1
+    fi
 }
 
 # Check if someone is logged into the device
@@ -48,8 +79,7 @@ function check_Connection() {
 }
 
 function main() {
-	: > "$logFile" 2>/dev/null
-	log_Message "Beginning ${scriptName} script"
+	printf "Beginning ${scriptName} script\n" > "$logFile"
 
     while IFS=, read -r -u 3 computerName ip 
     do
@@ -68,12 +98,12 @@ function main() {
             computerConnection="${computerName%$'\r'}"
         fi
 
-        "${scriptDir}/setup_Expect.expect" "$localAdmin" "$pass" "$computerConnection"
+        "${scriptDir}/setup.expect" "$localAdmin" "$pass" "$computerConnection" "$sshKey" "$sshKeyPUBLIC"
 
         sleep 1
 
         if { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
-            | ssh -i "/Users/arch/.ssh/mdmrenew" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" \
+            | ssh -i "$sshKey" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" \
                 "sudo -S -p '' /bin/bash -c 'cat > ${remoteScriptPath} && chmod 700 ${remoteScriptPath} && { nohup ${remoteScriptPath} >${remoteLogPath} 2>&1 </dev/null & }'";
         then
             log_Message "Enrollment script launched on ${computerConnection}"
