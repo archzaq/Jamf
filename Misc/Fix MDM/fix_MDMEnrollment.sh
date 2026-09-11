@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
 ###  Updated: 09-11-26   ###
-###  Version: 1.1        ###
+###  Version: 1.2        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -35,20 +35,20 @@ function log_Message() {
 function print_Usage() {
     cat <<EOF
 Usage:
-  bash $(basename "$0") [options]
+  bash $(basename "$0") [args]
 
 Required Arguments:
-  '$1'                  Local Admin Account Name
-  '$2'                  Local Admin Account Pass 
-  '$3'                  Local CSV file
-  '$4'                  SSH key path
+  '\$1'              Local Admin Account Name
+  '\$2'              Local Admin Account Pass 
+  '\$3'              Local CSV file
+  '\$4'              SSH key path
 
   bash $(basename "$0") "accountName" "accountPass" "csvFile" "sshKey"
 EOF
 }
 
 function check_Arguments() {
-    if [[ -z "$localAdmin" ]] | [[ -z "$pass" ]] | [[ -z "$csvFile" ]] | [[ -z "$sshKey" ]];
+    if [[ -z "$localAdmin" ]] || [[ -z "$pass" ]] || [[ -z "$csvFile" ]] || [[ -z "$sshKey" ]];
     then
         log_Message "Missing argument(s)" "ERROR"
         [[ -n "$localAdmin" ]] || log_Message "Missing Local Admin account name"
@@ -60,18 +60,6 @@ function check_Arguments() {
     fi
 }
 
-# Check if someone is logged into the device
-function check_Login() {
-	if [[ "$currentUser" == 'loginwindow' ]] || [[ -z "$currentUser" ]] || [[ "$currentUser" == 'root' ]];
-	then
-		log_Message "No one currently logged in"
-		return 1
-	else
-		log_Message "${currentUser} currently logged in"
-		return 0
-	fi
-}
-
 function check_Connection() {
     local computer="$1"
     ping -c 1 -W 2 "$computer" >/dev/null 2>&1
@@ -80,6 +68,8 @@ function check_Connection() {
 
 function main() {
 	printf "Beginning ${scriptName} script\n" > "$logFile"
+
+    check_Arguments
 
     while IFS=, read -r -u 3 computerName ip 
     do
