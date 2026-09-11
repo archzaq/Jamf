@@ -11,7 +11,9 @@ These scripts automate everything around that unavoidable click. Reaching the ma
 ## Scripts
 
 `fix_MDMEnrollment.sh` - Runs locally and reads the CSV, reaches each host, pushes and then runs the remote script
+
 `setup.expect` - Runs locally and installs the SSH public key on a host using password authentication
+
 `remote_Fix_MDMEnrollment.sh` - Runs remotely and does the actual enrollment work in front of the logged in user
 
 ## Usage
