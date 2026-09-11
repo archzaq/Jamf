@@ -3,8 +3,10 @@ set timeout 10
 set user [lindex $argv 0]
 set password [lindex $argv 1]
 set host [lindex $argv 2]
+set key [lindex $argv 3]
+set keyPub [lindex $argv 4]
 
-spawn sh -c "cat /path/to/key.pub | ssh -i /path/to/key -o IdentitiesOnly=yes $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
+spawn sh -c "cat $keyPub | ssh -i $key -o IdentitiesOnly=yes $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
 
 expect {
     "Are you sure you want to continue connecting (yes/no/\[fingerprint\])?" {
