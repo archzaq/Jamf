@@ -11,13 +11,30 @@ These scripts automate everything around that unavoidable click. Reaching the ma
 ## Scripts
 
 `fix_MDMEnrollment.sh` - Runs locally and reads the CSV, reaches each host, pushes and then runs the remote script
-`setup_Expect.expect` - Runs locally and installs the SSH public key on a host using password authentication
+`setup.expect` - Runs locally and installs the SSH public key on a host using password authentication
 `remote_Fix_MDMEnrollment.sh` - Runs remotely and does the actual enrollment work in front of the logged in user
+
+## Usage
+
+```
+bash fix_MDMEnrollment.sh "accountName" "accountPass" "csvFile" "sshKey"
+
+  accountName   Local admin account present on the target devices
+  accountPass   Password for that account
+  csvFile       Path to the CSV of device names and IPs
+  sshKey        Path to the private SSH key
+```
+
+Example:
+
+```
+bash fix_MDMEnrollment.sh 'admin' 'password' './test.csv' "~/.ssh/mdmrenew"
+```
 
 ## How It Works
 
-1. `fix_MDMEnrollment.sh` reads `test.csv` and tries each machine by hostname, falling back to its IP address.
-2. `setup_Expect.expect` pushes the local public key into the target's `~/.ssh/authorized_keys`, so the rest of the run uses key authentication instead of a password.
+1. `fix_MDMEnrollment.sh` reads the CSV it is given and tries each machine by hostname, falling back to its IP address.
+2. `setup.expect` pushes the local public key into the target's `~/.ssh/authorized_keys`, so the rest of the run uses key authentication instead of a password.
 3. The remote script is piped over that SSH connection, written to `/tmp` on the target, and launched detached with `nohup`. SSH returns immediately so the loop keeps moving through the sheet.
 4. On the target device running with sudo, `remote_Fix_MDMEnrollment.sh`:
    - confirms someone is logged into the GUI
