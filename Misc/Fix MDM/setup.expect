@@ -9,7 +9,7 @@ set keyPub [lindex $argv 4]
 spawn sh -c "cat $keyPub | ssh -i $key -o IdentitiesOnly=yes $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
 
 expect {
-    "Are you sure you want to continue connecting (yes/no/\[fingerprint\])?" {
+    "Are you sure you want to continue connecting" {
         send "yes\r"
         exp_continue
     }

@@ -28,7 +28,7 @@ bash fix_MDMEnrollment.sh "accountName" "accountPass" "csvFile" "sshKey"
 Example:
 
 ```
-bash fix_MDMEnrollment.sh 'admin' 'password' './test.csv' "~/.ssh/mdmrenew"
+bash fix_MDMEnrollment.sh 'admin' 'password' './test.csv' "/full/pathto/.ssh/key"
 ```
 
 ## How It Works
