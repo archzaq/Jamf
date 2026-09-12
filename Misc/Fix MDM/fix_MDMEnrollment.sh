@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
 ###  Updated: 09-11-26   ###
-###  Version: 1.2        ###
+###  Version: 1.3        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -34,6 +34,7 @@ function log_Message() {
 # Info on how to run the script
 function print_Usage() {
     cat <<EOF
+
 Usage:
   bash $(basename "$0") [args]
 
@@ -75,6 +76,8 @@ function main() {
 
     while IFS=, read -r -u 3 computerName ip 
     do
+        computerName="${computerName%$'\r'}"
+        ip="${ip%$'\r'}"
         [[ "$computerName" == *"Computer Name"* ]] && continue
         if ! check_Connection "$computerName";
         then
@@ -84,10 +87,10 @@ function main() {
                 log_Message "Unable to contact ${computerName} at ${ip}, skipping" "ERROR"
                 continue
             else
-                computerConnection="${ip%$'\r'}"
+                computerConnection="$ip"
             fi
         else
-            computerConnection="${computerName%$'\r'}"
+            computerConnection="$computerName"
         fi
 
         "${scriptDir}/setup.expect" "$localAdmin" "$pass" "$computerConnection" "$sshKey" "$sshKeyPUBLIC"
