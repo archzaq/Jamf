@@ -18,7 +18,7 @@ These scripts automate everything around that unavoidable click. Reaching the ma
 
 ## Usage
 1. Download all three scripts into the same folder
-2. Create an SSH key for this process
+2. Create an SSH key for this process and do NOT set a passphrase<br />
    `ssh-keygen -t ed25519 -C "mdmrenewal key" -f ~/.ssh/mdmrenew`
 3. Run the following command to start the process
 ```
