@@ -34,7 +34,7 @@ bash fix_MDMEnrollment.sh "accountName" "accountPass" "csvFile" "sshKey"
 Example:
 
 ```
-bash fix_MDMEnrollment.sh 'admin' 'password' './test.csv' "/full/pathto/.ssh/key"
+bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/pathto/.ssh/key"
 ```
 
 ## How It Works
