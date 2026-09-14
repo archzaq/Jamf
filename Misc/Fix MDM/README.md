@@ -17,7 +17,7 @@ These scripts automate everything around that unavoidable click. Reaching the ma
 `remote_Fix_MDMEnrollment.sh` - Runs remotely and does the actual enrollment work in front of the logged in user
 
 ## Usage
-1. Gather list of devices in a CSV with the headers "Computer Name" and "IP"
+1. Gather list of effected devices in a CSV with the headers "Computer Name" and "IP" (Template provided)
 2. Download all three scripts into the same folder
 3. Create an SSH key for this process and do NOT set a passphrase<br />
    `ssh-keygen -t ed25519 -C "mdmrenewal key" -f ~/.ssh/mdmrenew`
