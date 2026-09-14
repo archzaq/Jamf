@@ -17,7 +17,10 @@ These scripts automate everything around that unavoidable click. Reaching the ma
 `remote_Fix_MDMEnrollment.sh` - Runs remotely and does the actual enrollment work in front of the logged in user
 
 ## Usage
-
+1. Download all three scripts into the same folder
+2. Create an SSH key for this process
+   `ssh-keygen -t ed25519 -C "mdmrenewal key" -f ~/.ssh/mdmrenew`
+3. Run the following command to start the process
 ```
 bash fix_MDMEnrollment.sh "accountName" "accountPass" "csvFile" "sshKey"
 
