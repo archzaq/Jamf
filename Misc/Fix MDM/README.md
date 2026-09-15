@@ -49,7 +49,7 @@ bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/path
    - starts a monitor that kills any `sudo` the user attempts to abuse
    - adds the user to the `admin` group
    - runs `profiles renew -type enrollment` inside the user's GUI session so the prompt actually appears on their screen
-   - polls until the device reports enrollment, or the timeout expires
+   - polls until the device reports enrollment, the user closes the enrollment window (**Not Now**), or the timeout expires
    - removes the admin rights, kills the monitor, and reports the result in a final dialog
 
 Admin rights are removed on every exit path, including errors, timeouts, and interrupts.
