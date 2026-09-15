@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-10-26   ###
 ###  Updated: 09-15-26   ###
-###  Version: 1.1        ###
+###  Version: 1.2        ###
 ############################
 
 readonly scriptName='remote_Fix_MDMEnrollment'
@@ -14,6 +14,7 @@ readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents
 readonly dialogTitle='SLU ITS: Device Enrollment'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly enrollTimeout=300
+readonly windowGrace=15
 activeIconPath="$SLUIconFile"
 currentUserUID=''
 existingAdmin=false
@@ -163,17 +164,63 @@ function renew_Enrollment() {
     return $?
 }
 
-# Poll until the device reports an MDM enrollment or the window closes
+# Check if the Remote Management enrollment window (Setup Assistant) is open in the console user session
+function enrollmentWindow_Check() {
+    /usr/bin/pgrep -u "$currentUserUID" "Setup Assistant" &>/dev/null
+    return $?
+}
+
+# Poll until the device reports an MDM enrollment, the enrollment window closes, or the timeout expires
 function wait_ForEnrollment() {
     local endTime=$(($(date +%s) + enrollTimeout))
+    local windowOpened=false
+    local windowClosed=false
+
+    # Wait for the window to appear, then keep checking until it goes away
     while [[ $(date +%s) -lt $endTime ]];
     do
         if enrollment_Check;
         then
             return 0
         fi
-        sleep 5
+        if enrollmentWindow_Check;
+        then
+            if [[ "$windowOpened" == false ]];
+            then
+                windowOpened=true
+                log_Message "Enrollment window opened"
+            fi
+        elif [[ "$windowOpened" == true ]];
+        then
+            windowClosed=true
+            log_Message "Enrollment window closed"
+            break
+        fi
+        sleep 2
     done
+
+    if [[ "$windowClosed" == false ]];
+    then
+        if [[ "$windowOpened" == false ]];
+        then
+            log_Message "Enrollment window never appeared within ${enrollTimeout}s" "ERROR"
+        else
+            log_Message "Enrollment window still open after ${enrollTimeout}s" "ERROR"
+        fi
+        return 1
+    fi
+
+    # Enrollment can register just after the window closes, allow a short grace period before giving up
+    endTime=$(($(date +%s) + windowGrace))
+    while [[ $(date +%s) -lt $endTime ]];
+    do
+        if enrollment_Check;
+        then
+            return 0
+        fi
+        sleep 1
+    done
+    log_Message "Enrollment window closed without enrolling" "ERROR"
     return 1
 }
 
@@ -268,7 +315,7 @@ function main() {
     if [[ "$existingAdmin" == false ]];
     then
         log_Message "Starting monitor" "SECURITY"
-        monitor_Commands "$currentUser" "$enrollTimeout" &
+        monitor_Commands "$currentUser" "$((enrollTimeout + windowGrace))" &
         monitorPID=$!
         log_Message "Granting temporary permissions to $currentUser"
         if ! addAccount_AdminGroup "$currentUser";
@@ -294,7 +341,7 @@ function main() {
         display_Dialog "This Mac is now enrolled!\n\nThank you!"
         exit_Func
     else
-        log_Message "Device did not enroll within ${enrollTimeout}s" "ERROR"
+        log_Message "Device did not enroll" "ERROR"
         display_Dialog "This Mac was not enrolled!\n\nPlease contact the ITS Service Desk at (314)-977-4000 so we may try again."
         exit_Func "error"
     fi
