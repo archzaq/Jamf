@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-10-26   ###
 ###  Updated: 09-15-26   ###
-###  Version: 1.2        ###
+###  Version: 1.3        ###
 ############################
 
 readonly scriptName='remote_Fix_MDMEnrollment'
@@ -14,7 +14,7 @@ readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents
 readonly dialogTitle='SLU ITS: Device Enrollment'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly enrollTimeout=300
-readonly windowGrace=15
+readonly windowGrace=10
 activeIconPath="$SLUIconFile"
 currentUserUID=''
 existingAdmin=false
