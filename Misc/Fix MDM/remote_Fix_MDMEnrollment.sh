@@ -3,8 +3,8 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 09-10-26   ###
-###  Updated: 09-10-26   ###
-###  Version: 1.0        ###
+###  Updated: 09-15-26   ###
+###  Version: 1.1        ###
 ############################
 
 readonly scriptName='remote_Fix_MDMEnrollment'
@@ -13,7 +13,7 @@ readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
 readonly genericIconFile='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Everyone.icns'
 readonly dialogTitle='SLU ITS: Device Enrollment'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-readonly enrollTimeout=600
+readonly enrollTimeout=300
 activeIconPath="$SLUIconFile"
 currentUserUID=''
 existingAdmin=false
@@ -247,7 +247,7 @@ function main() {
     if enrollment_Check;
     then
         log_Message "Device already reports an MDM enrollment"
-        display_Dialog "This Mac is already enrolled.\n\nNo action is needed."
+        # display_Dialog "This Mac is already enrolled.\n\nNo action is needed."
         exit_Func
     fi
 
@@ -260,7 +260,7 @@ function main() {
 
     ### START ###
     # Warn the user before anything pops up so the prompt is not dismissed
-    display_Dialog "This Mac has lost its connection to SLU ITS device management and needs to be re-enrolled.\n\nIn a moment you will see a Device Enrollment notification from System Settings.\n\nYou MUST select \"Enroll\" for this to work. If you dismiss it, this Mac will stay unmanaged.\n\nIf you miss the notification, open System Settings and look for the Device Enrollment prompt there."
+    display_Dialog "This Mac has lost its connection to SLU ITS device management and needs to be re-enrolled.\n\nIn a moment you will see a Device Enrollment notification from System Settings.\n\nYou MUST select \"Enroll\" for this to work.\n\nIf you miss the notification, open System Settings and look for the Device Enrollment prompt there."
 
     precheckComplete=true
 
