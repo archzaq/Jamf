@@ -196,7 +196,7 @@ function wait_ForEnrollment() {
             log_Message "Enrollment window closed"
             break
         fi
-        sleep 2
+        sleep 1
     done
 
     if [[ "$windowClosed" == false ]];
