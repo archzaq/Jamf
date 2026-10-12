@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
 ###  Updated: 10-12-26   ###
-###  Version: 1.4        ###
+###  Version: 1.5        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -112,7 +112,7 @@ function main() {
         esac
 
         if { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
-            | ssh -i "$sshKey" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 "${localAdmin}@${computerConnection}" \
+            | ssh -i "$sshKey" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o WarnWeakCrypto=no-pq-kex "${localAdmin}@${computerConnection}" \
                 "sudo -S -p '' /bin/bash -c 'cat > ${remoteScriptPath} && chmod 700 ${remoteScriptPath} && { nohup ${remoteScriptPath} >${remoteLogPath} 2>&1 </dev/null & }'";
         then
             log_Message "Enrollment script launched on ${computerConnection}"
