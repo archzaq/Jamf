@@ -3,8 +3,8 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
-###  Updated: 09-11-26   ###
-###  Version: 1.3        ###
+###  Updated: 10-12-26   ###
+###  Version: 1.4        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -65,7 +65,7 @@ function check_Arguments() {
 # Ping a device
 function check_Connection() {
     local computer="$1"
-    ping -c 1 -W 2 "$computer" >/dev/null 2>&1
+    ping -c 1 -t 2 "$computer" >/dev/null 2>&1
     return $?
 }
 
@@ -94,11 +94,25 @@ function main() {
         fi
 
         "${scriptDir}/setup.expect" "$localAdmin" "$pass" "$computerConnection" "$sshKey" "$sshKeyPUBLIC"
-
-        sleep 1
+        result="$?"
+        case $result in
+            0) ;;
+            2)
+                log_Message "Password rejected by ${computerConnection}, skipping" "ERROR"
+                continue
+                ;;
+            3)
+                log_Message "Timed out installing SSH key on ${computerConnection}, skipping" "ERROR"
+                continue
+                ;;
+            *)
+                log_Message "Failed to install SSH key on ${computerConnection}, skipping" "ERROR"
+                continue
+                ;;
+        esac
 
         if { printf '%s\n' "$pass"; cat "${scriptDir}/remote_Fix_MDMEnrollment.sh"; } \
-            | ssh -i "$sshKey" -o IdentitiesOnly=yes "${localAdmin}@${computerConnection}" \
+            | ssh -i "$sshKey" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 "${localAdmin}@${computerConnection}" \
                 "sudo -S -p '' /bin/bash -c 'cat > ${remoteScriptPath} && chmod 700 ${remoteScriptPath} && { nohup ${remoteScriptPath} >${remoteLogPath} 2>&1 </dev/null & }'";
         then
             log_Message "Enrollment script launched on ${computerConnection}"
