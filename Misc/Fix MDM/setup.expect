@@ -1,20 +1,28 @@
 #!/usr/bin/expect -f
-set timeout 10
+
+set timeout 15
 set user [lindex $argv 0]
 set password [lindex $argv 1]
 set host [lindex $argv 2]
 set key [lindex $argv 3]
 set keyPub [lindex $argv 4]
 
-spawn sh -c "cat $keyPub | ssh -i $key -o IdentitiesOnly=yes $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
+spawn sh -c "cat $keyPub | ssh -o PubkeyAuthentication=no -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $user@$host 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && k=\$(cat) && { grep -qxF \"\$k\" ~/.ssh/authorized_keys 2>/dev/null || printf \"%s\\n\" \"\$k\" >> ~/.ssh/authorized_keys; } && chmod 600 ~/.ssh/authorized_keys'"
 
+set sentPassword 0
 expect {
-    "Are you sure you want to continue connecting" {
-        send "yes\r"
+    -re "(P|p)assword:" {
+        if {$sentPassword} {
+            # Prompted again, so the password was rejected
+            exit 2
+        }
+        set sentPassword 1
+        send -- "$password\r"
         exp_continue
     }
-    "Password:" {
-        send "$password\r"
-    }
+    timeout { exit 3 }
+    eof
 }
-expect eof
+
+set result [wait]
+exit [lindex $result 3]
