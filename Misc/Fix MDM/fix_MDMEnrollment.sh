@@ -3,8 +3,8 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
-###  Updated: 10-12-26   ###
-###  Version: 1.5        ###
+###  Updated: 10-13-26   ###
+###  Version: 1.6        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -81,7 +81,7 @@ function main() {
         [[ "$computerName" == *"Computer Name"* ]] && continue
         if ! check_Connection "$computerName";
         then
-            log_Message "Unable to contact ${computerName} by hostname, trying by IP" "ERROR"
+            log_Message "Unable to contact ${computerName} by hostname, trying by IP" "WARN"
             if ! check_Connection "$ip";
             then
                 log_Message "Unable to contact ${computerName} at ${ip}, skipping" "ERROR"
@@ -115,7 +115,7 @@ function main() {
             | ssh -i "$sshKey" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o WarnWeakCrypto=no-pq-kex "${localAdmin}@${computerConnection}" \
                 "sudo -S -p '' /bin/bash -c 'cat > ${remoteScriptPath} && chmod 700 ${remoteScriptPath} && { nohup ${remoteScriptPath} >${remoteLogPath} 2>&1 </dev/null & }'";
         then
-            log_Message "Enrollment script launched on ${computerConnection}"
+            log_Message "Enrollment script successfully launched on ${computerConnection}"
         else
             log_Message "Failed to launch enrollment script on ${computerConnection}" "ERROR"
         fi
