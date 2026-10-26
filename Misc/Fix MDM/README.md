@@ -41,8 +41,9 @@ bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/path
 `fix_MDMEnrollment.sh` does all of the work, you just have to setup your environment with an SSH key and a list of devices before attempting to run this process.
 1. `fix_MDMEnrollment.sh` reads the CSV it is given and tries each machine by hostname, falling back to its IP address.
 2. `fix_MDMEnrollment.sh` then calls `setup.expect` and it pushes the local public key into the target's `~/.ssh/authorized_keys`, so the rest of the run uses key authentication instead of a password.
-3. `fix_MDMEnrollment.sh` then pushes the `remote_Fix_MDMEnrollment.sh` over that SSH connection, written to `/tmp` on the target, and launched detached with `nohup` and SSH returns immediately so the loop keeps moving through the sheet.
-4. On the target device running with sudo, `remote_Fix_MDMEnrollment.sh`:
+3. `fix_MDMEnrollment.sh` then copies the log (`/var/log/remote_Fix_MDMEnrollment.log`) and `nohup` output (`/tmp/remote_Fix_MDMEnrollment.out`) from the last run off the target before a new run overwrites them, saving both to `~/Desktop/fix_MDMEnrollment_Logs/` and adding the outcome to `summary.csv` in that folder. If an earlier run is still going on the target, it is left alone and the device is skipped so two copies never run at once.
+4. `fix_MDMEnrollment.sh` then pushes the `remote_Fix_MDMEnrollment.sh` over that SSH connection, written to `/tmp` on the target, and launched detached with `nohup` and SSH returns immediately so the loop keeps moving through the sheet.
+5. On the target device running with sudo, `remote_Fix_MDMEnrollment.sh`:
    - confirms someone is logged into the GUI
    - exits early if the device already reports an MDM enrollment
    - shows an AppleScript dialog in the user's session explaining that an enrollment prompt is coming and that they must select **Enroll**
