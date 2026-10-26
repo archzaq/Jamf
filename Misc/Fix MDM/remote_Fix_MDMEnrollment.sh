@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-10-26   ###
 ###  Updated: 10-26-26   ###
-###  Version: 1.4        ###
+###  Version: 1.5        ###
 ############################
 
 readonly scriptName='remote_Fix_MDMEnrollment'
@@ -22,6 +22,7 @@ activeIconPath="$SLUIconFile"
 currentUserUID=''
 existingAdmin=false
 precheckComplete=false
+permissionsRevoked=false
 trapExecuted=false
 monitorPID=''
 
@@ -347,7 +348,40 @@ function wait_ForEnrollment() {
     return 1
 }
 
-# Remove any granted permissions, ensure monitor is killed
+# Remove any granted permissions, ensure monitor is killed, only runs once
+function revoke_Permissions() {
+    if [[ "$permissionsRevoked" == true ]];
+    then
+        return
+    fi
+    permissionsRevoked=true
+
+    log_Message "Checking permissions for $currentUser"
+    if ! removeAccount_AdminGroup "$currentUser";
+    then
+        log_Message "Unable to remove permissions from $currentUser" "ERROR"
+    else
+        log_Message "$currentUser permissions handled"
+    fi
+
+    if [[ -n "$monitorPID" ]];
+    then
+        if ps "$monitorPID" &>/dev/null;
+        then
+            log_Message "Killing monitor" "SECURITY"
+            if kill "$monitorPID" &>/dev/null;
+            then
+                log_Message "Monitor killed" "SECURITY"
+            else
+                log_Message "Monitor not killed. Kill $monitorPID in Activity Monitor" "ERROR"
+            fi
+        else
+            log_Message "Monitor PID not found, already exited" "SECURITY"
+        fi
+    fi
+}
+
+# Exit after making sure any granted permissions are removed
 function exit_Func() {
     local type="$1"
     if [[ "$trapExecuted" == true ]];
@@ -358,29 +392,7 @@ function exit_Func() {
 
     if [[ "$precheckComplete" == true ]];
     then
-        log_Message "Checking permissions for $currentUser"
-        if ! removeAccount_AdminGroup "$currentUser";
-        then
-            log_Message "Unable to remove permissions from $currentUser" "ERROR"
-        else
-            log_Message "$currentUser permissions handled"
-        fi
-
-        if [[ -n "$monitorPID" ]];
-        then
-            if ps "$monitorPID" &>/dev/null;
-            then
-                log_Message "Killing monitor" "SECURITY"
-                if kill "$monitorPID" &>/dev/null;
-                then
-                    log_Message "Monitor killed" "SECURITY"
-                else
-                    log_Message "Monitor not killed. Kill $monitorPID in Activity Monitor" "ERROR"
-                fi
-            else
-                log_Message "Monitor PID not found, already exited" "SECURITY"
-            fi
-        fi
+        revoke_Permissions
     fi
 
     if [[ "$type" == 'error' ]];
@@ -481,6 +493,7 @@ function main() {
         if ! addAccount_AdminGroup "$currentUser";
         then
             log_Message "Unable to grant permissions to $currentUser" "ERROR"
+            revoke_Permissions
             display_Dialog "Something went wrong preparing this Mac for enrollment.\n\nPlease contact the ITS Service Desk at (314)-977-4000."
             exit_Func "error"
         fi
@@ -498,10 +511,13 @@ function main() {
     if wait_ForEnrollment;
     then
         log_Message "Device successfully enrolled"
+        # Take admin back before the final dialog, it can sit open long after the monitor stops
+        revoke_Permissions
         display_Dialog "This Mac is now enrolled!\n\nThank you!"
         exit_Func
     else
         log_Message "Device did not enroll" "ERROR"
+        revoke_Permissions
         display_Dialog "This Mac was not enrolled!\n\nPlease contact the ITS Service Desk at (314)-977-4000 so we may try again."
         exit_Func "error"
     fi

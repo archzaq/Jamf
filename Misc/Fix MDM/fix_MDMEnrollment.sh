@@ -4,7 +4,7 @@
 ###  Author:  Zac Reeves ###
 ###  Created: 09-09-26   ###
 ###  Updated: 10-26-26   ###
-###  Version: 1.7        ###
+###  Version: 1.8        ###
 ############################
 
 readonly scriptName='fix_MDMEnrollment'
@@ -20,6 +20,7 @@ readonly pass="$2"
 readonly csvFile="$3"
 readonly sshKey="$4"
 readonly sshKeyPUBLIC="${sshKey}.pub"
+readonly runMode="$5"
 
 # Append current status to log file
 function log_Message() {
@@ -47,7 +48,11 @@ Required Arguments:
   '\$3'              Local CSV file
   '\$4'              SSH key path
 
+Optional Arguments:
+  '\$5'              --logs-only, collect the last run's logs without launching the enrollment script
+
   bash $(basename "$0") "accountName" "accountPass" "csvFile" "sshKey"
+  bash $(basename "$0") "accountName" "accountPass" "csvFile" "sshKey" --logs-only
 EOF
 }
 
@@ -60,6 +65,13 @@ function check_Arguments() {
         [[ -n "$pass" ]] || log_Message "Missing Local Admin pass"
         [[ -n "$csvFile" ]] || log_Message "Missing path to CSV with device names"
         [[ -n "$sshKey" ]] || log_Message "Missing path to SSH key"
+        print_Usage
+        exit 1
+    fi
+    # Refuse anything unexpected so a typo never launches the enrollment script by mistake
+    if [[ -n "$runMode" ]] && [[ "$runMode" != '--logs-only' ]];
+    then
+        log_Message "Unknown option: ${runMode}" "ERROR"
         print_Usage
         exit 1
     fi
@@ -161,7 +173,7 @@ function add_SummaryRow() {
         "$(csv_Field "$mdmIdentity")" \
         "$(csv_Field "$detail")" \
         "$(csv_Field "$scriptOutput")" >> "$summaryFile"
-    log_Message "Previous run on ${connection}: ${outcome}${detail:+ (${detail})}"
+    log_Message "Last run on ${connection}: ${outcome}${detail:+ (${detail})}"
     if [[ -n "$scriptOutput" ]];
     then
         log_Message "Script output on ${connection}: ${scriptOutput}" "WARN"
@@ -196,7 +208,13 @@ function collect_RemoteLogs() {
 }
 
 function main() {
-	printf "Beginning ${scriptName} script\n" > "$logFile"
+	if [[ "$runMode" == '--logs-only' ]];
+	then
+		# Append so the log from the enrollment run is kept
+		printf "Beginning ${scriptName} script (logs only)\n" >> "$logFile"
+	else
+		printf "Beginning ${scriptName} script\n" > "$logFile"
+	fi
 
     check_Arguments
 
@@ -262,6 +280,11 @@ function main() {
         # Grab the last runs logs before the new run overwrites them
         collect_RemoteLogs "$computerName" "$computerConnection" "$scriptRunning"
 
+        if [[ "$runMode" == '--logs-only' ]];
+        then
+            continue
+        fi
+
         if [[ "$scriptRunning" == true ]];
         then
             log_Message "Enrollment script still running on ${computerConnection}, skipping" "WARN"
@@ -279,6 +302,7 @@ function main() {
 
     done 3< "$csvFile"
 
+    log_Message "Collected logs and summary saved to ${collectedLogDir}"
     exit 0
 }
 
