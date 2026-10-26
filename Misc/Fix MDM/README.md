@@ -44,9 +44,10 @@ bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/path
 3. `fix_MDMEnrollment.sh` then copies the log (`/var/log/remote_Fix_MDMEnrollment.log`) and `nohup` output (`/tmp/remote_Fix_MDMEnrollment.out`) from the last run off the target before a new run overwrites them, saving both to `~/Desktop/fix_MDMEnrollment_Logs/` and adding the outcome to `summary.csv` in that folder. If an earlier run is still going on the target, it is left alone and the device is skipped so two copies never run at once.
 4. `fix_MDMEnrollment.sh` then pushes the `remote_Fix_MDMEnrollment.sh` over that SSH connection, written to `/tmp` on the target, and launched detached with `nohup` and SSH returns immediately so the loop keeps moving through the sheet.
 5. On the target device running with sudo, `remote_Fix_MDMEnrollment.sh`:
+   - if the device reports an MDM enrollment, checks the MDM identity certificate and the Jamf built-in CA in the System keychain, and exits early unless one of them has expired, so healthy Macs are left alone
    - confirms someone is logged into the GUI
-   - exits early if the device already reports an MDM enrollment
    - shows an AppleScript dialog in the user's session explaining that an enrollment prompt is coming and that they must select **Enroll**
+   - removes the Jamf framework and the expired MDM profile with `jamf removeFramework`, and stops if the profile will not come off (the PreStage reinstalls the framework on re-enrollment)
    - starts a monitor that kills any `sudo` the user attempts to abuse
    - adds the user to the `admin` group
    - runs `profiles renew -type enrollment` inside the user's GUI session so the prompt actually appears on their screen

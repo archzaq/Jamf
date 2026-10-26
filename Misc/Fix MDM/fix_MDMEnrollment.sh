@@ -107,11 +107,16 @@ function add_SummaryRow() {
     local lastRun=''
     local outcome='No previous run'
     local detail=''
+    local mdmIdentity=''
     local scriptOutput=''
 
     if [[ -s "$collectedLog" ]];
     then
         lastRun="$(head -n 1 "$collectedLog" | awk '{ print $2, $3 }')"
+        mdmIdentity="$(sed -n -E \
+            -e 's/.*MDM identity expired on (.*)/\1 (expired)/p' \
+            -e 's/.*MDM identity valid until (.*)/\1 (valid)/p' \
+            -e 's/.*Jamf CA expired on (.*)/\1 (CA expired)/p' "$collectedLog" | head -n 1)"
     fi
 
     # The script logs everything itself, so anything in the nohup output is usually a crash
@@ -147,12 +152,13 @@ function add_SummaryRow() {
         detail="$(grep -m 1 '^ERROR:' "$collectedLog" | cut -d ' ' -f 4-)"
     fi
 
-    printf '%s,%s,%s,%s,%s,%s,%s\n' \
+    printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
         "$(csv_Field "$computer")" \
         "$(csv_Field "$connection")" \
         "$(csv_Field "$(date "+%F %T")")" \
         "$(csv_Field "$lastRun")" \
         "$(csv_Field "$outcome")" \
+        "$(csv_Field "$mdmIdentity")" \
         "$(csv_Field "$detail")" \
         "$(csv_Field "$scriptOutput")" >> "$summaryFile"
     log_Message "Previous run on ${connection}: ${outcome}${detail:+ (${detail})}"
@@ -197,7 +203,7 @@ function main() {
     mkdir -p "$collectedLogDir"
     if [[ ! -f "$summaryFile" ]];
     then
-        printf 'Computer Name,Connection,Collected,Last Run,Outcome,Detail,Script Output\n' > "$summaryFile"
+        printf 'Computer Name,Connection,Collected,Last Run,Outcome,MDM Identity,Detail,Script Output\n' > "$summaryFile"
     fi
 
     while IFS=, read -r -u 3 computerName ip 
