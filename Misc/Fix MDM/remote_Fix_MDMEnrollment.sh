@@ -15,6 +15,7 @@ readonly dialogTitle='SLU ITS: Device Enrollment'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly enrollTimeout=300
 readonly windowGrace=10
+readonly removalTimeout=30
 readonly maxAttempts=10000
 attempt=0
 activeIconPath="$SLUIconFile"
@@ -51,7 +52,7 @@ function icon_Check() {
         if [[ -f '/usr/local/bin/jamf' ]];
         then
             log_Message "Attempting icon install via Jamf"
-            /usr/local/bin/jamf policy -event SLUFonts
+            /usr/local/bin/jamf policy -event SLUFonts &>/dev/null
         else
             log_Message "No Jamf binary found"
         fi
@@ -167,6 +168,116 @@ OOP
 function enrollment_Check() {
     /usr/bin/profiles status -type enrollment 2>/dev/null | grep -q 'MDM enrollment: Yes'
     return $?
+}
+
+# Check the MDM identity and Jamf built-in CA certificates in the System keychain
+# Returns 0 if expired, 1 if still valid, 2 if no MDM identity was found
+function mdmIdentity_Check() {
+    local certs="$(/usr/bin/security find-certificate -a -p /Library/Keychains/System.keychain 2>/dev/null)"
+    local line
+    local pem=''
+    local issuer
+    local subject
+    local expiry
+    local status
+    local identityExpiry=''
+    local identityValid=false
+    local caExpiry=''
+    local caValid=false
+
+    while IFS= read -r line;
+    do
+        pem+="$line"$'\n'
+        if [[ "$line" != *"END CERTIFICATE"* ]];
+        then
+            continue
+        fi
+        issuer="$(/usr/bin/openssl x509 -noout -issuer <<< "$pem" 2>/dev/null)"
+        if [[ "$issuer" == *"Built-in Certificate Authority"* ]];
+        then
+            subject="$(/usr/bin/openssl x509 -noout -subject <<< "$pem" 2>/dev/null)"
+            expiry="$(/usr/bin/openssl x509 -noout -enddate <<< "$pem" 2>/dev/null | cut -d '=' -f 2)"
+            status='valid'
+            /usr/bin/openssl x509 -noout -checkend 0 <<< "$pem" &>/dev/null || status='EXPIRED'
+            # The CA signs itself, anything else it issued is this Mac's MDM identity
+            # Old certificates can be left behind, so one valid certificate of each kind is enough
+            if [[ "${issuer#*=}" == "${subject#*=}" ]];
+            then
+                log_Message "Found Jamf CA certificate expiring ${expiry} (${status})"
+                if [[ "$status" == 'valid' ]];
+                then
+                    caValid=true
+                    caExpiry="$expiry"
+                elif [[ "$caValid" == false ]];
+                then
+                    caExpiry="$expiry"
+                fi
+            else
+                log_Message "Found MDM identity certificate expiring ${expiry} (${status})"
+                if [[ "$status" == 'valid' ]];
+                then
+                    identityValid=true
+                    identityExpiry="$expiry"
+                elif [[ "$identityValid" == false ]];
+                then
+                    identityExpiry="$expiry"
+                fi
+            fi
+        fi
+        pem=''
+    done <<< "$certs"
+
+    if [[ -z "$identityExpiry" ]];
+    then
+        log_Message "No MDM identity certificate found" "ERROR"
+        return 2
+    fi
+    if [[ "$identityValid" == false ]];
+    then
+        log_Message "MDM identity expired on ${identityExpiry}"
+        return 0
+    fi
+    if [[ -n "$caExpiry" ]] && [[ "$caValid" == false ]];
+    then
+        log_Message "Jamf CA expired on ${caExpiry}"
+        return 0
+    fi
+    log_Message "MDM identity valid until ${identityExpiry}"
+    return 1
+}
+
+# Remove the Jamf framework along with the expired MDM profile, then wait for the profile to clear so the enrollment check only sees the new one
+# The PreStage reinstalls the framework when the device re-enrolls
+function remove_JamfFramework() {
+    local removeOutput
+    local lastLine
+    local endTime
+    if ! enrollment_Check;
+    then
+        log_Message "No existing MDM profile to remove"
+        return 0
+    fi
+    if [[ ! -f '/usr/local/bin/jamf' ]];
+    then
+        log_Message "No Jamf binary found, unable to remove the Jamf framework" "ERROR"
+        return 1
+    fi
+
+    log_Message "Removing the Jamf framework and existing MDM profile"
+    removeOutput="$(/usr/local/bin/jamf removeFramework 2>&1)"
+    endTime=$(($(date +%s) + removalTimeout))
+    while [[ $(date +%s) -lt $endTime ]];
+    do
+        if ! enrollment_Check;
+        then
+            log_Message "MDM profile removed"
+            return 0
+        fi
+        sleep 1
+    done
+    lastLine="$(printf '%s\n' "$removeOutput" | grep -v '^[[:space:]]*$' | tail -n 1)"
+    log_Message "MDM profile still installed ${removalTimeout}s after removing the Jamf framework, it may not be removable${lastLine:+ (${lastLine})}" "ERROR"
+    return 1
 }
 
 # Trigger the enrollment prompt inside the console user GUI session
@@ -288,6 +399,25 @@ function main() {
     trap 'log_Message "Script interrupt" "ERROR"; exit_Func "error"' INT TERM
     printf "Log: $(date "+%F %T") Beginning ${scriptName} script\n" > "$logFile"
 
+    # Only an expired MDM enrollment needs replacing, leave healthy Macs alone
+    if enrollment_Check;
+    then
+        mdmIdentity_Check
+        case $? in
+            0)
+                log_Message "Device reports an expired MDM enrollment, replacing it"
+                ;;
+            1)
+                log_Message "Device already reports an MDM enrollment that is still valid"
+                exit_Func
+                ;;
+            *)
+                log_Message "Unable to confirm the MDM enrollment has expired, leaving it alone" "ERROR"
+                exit_Func "error"
+                ;;
+        esac
+    fi
+
     # Ensure someone is at the GUI to answer the enrollment prompt
     if ! check_Login;
     then
@@ -300,14 +430,6 @@ function main() {
     then
         log_Message "Missing SLU icon" "ERROR"
         exit_Func "error"
-    fi
-
-    # Nothing to do if the device is already enrolled
-    if enrollment_Check;
-    then
-        log_Message "Device already reports an MDM enrollment"
-        # display_Dialog "This Mac is already enrolled.\n\nNo action is needed."
-        exit_Func
     fi
 
     # Check this first for proper removal of permissions on exit
@@ -341,6 +463,13 @@ function main() {
     fi
 
     precheckComplete=true
+
+    # The expired profile blocks re-enrollment and would make the enrollment check report success, clear it first
+    if ! remove_JamfFramework;
+    then
+        display_Dialog "Something went wrong preparing this Mac for enrollment.\n\nPlease contact the ITS Service Desk at (314)-977-4000."
+        exit_Func "error"
+    fi
 
     # Grant the permissions needed to approve the enrollment, watched the whole time
     if [[ "$existingAdmin" == false ]];
