@@ -3,8 +3,8 @@
 ############################
 ###  Author:  Zac Reeves ###
 ###  Created: 09-10-26   ###
-###  Updated: 09-15-26   ###
-###  Version: 1.3        ###
+###  Updated: 10-26-26   ###
+###  Version: 1.4        ###
 ############################
 
 readonly scriptName='remote_Fix_MDMEnrollment'
@@ -15,6 +15,8 @@ readonly dialogTitle='SLU ITS: Device Enrollment'
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
 readonly enrollTimeout=300
 readonly windowGrace=10
+readonly maxAttempts=10000
+attempt=0
 activeIconPath="$SLUIconFile"
 currentUserUID=''
 existingAdmin=false
@@ -135,20 +137,30 @@ function display_Dialog() {
         set promptString to "$promptString"
         set iconPath to "$activeIconPath"
         set dialogTitle to "$dialogTitle"
-        display dialog promptString buttons {"OK"} default button "OK" with icon POSIX file iconPath with title dialogTitle giving up after 900
+        set dialogResult to display dialog promptString buttons {"OK"} default button "OK" with icon POSIX file iconPath with title dialogTitle giving up after 900
+        if gave up of dialogResult then
+            return "TIMEOUT"
+        end if
         return "OK"
     on error
         return "ERROR"
     end try
 OOP
     )
-    if [[ "$dialogResult" != 'OK' ]];
-    then
-        log_Message "Unable to display dialog: ${dialogResult}" "ERROR"
-        return 1
-    fi
-    log_Message "Continued through dialog"
-    return 0
+    case "$dialogResult" in
+        'OK')
+            log_Message "Continued through dialog"
+            return 0
+            ;;
+        'TIMEOUT')
+            log_Message "Dialog timed out without a response" "WARN"
+            return 2
+            ;;
+        *)
+            log_Message "Unable to display dialog: ${dialogResult}" "ERROR"
+            return 1
+            ;;
+    esac
 }
 
 # Check if the device currently has an MDM enrollment
@@ -307,7 +319,26 @@ function main() {
 
     ### START ###
     # Warn the user before anything pops up so the prompt is not dismissed
-    display_Dialog "This Mac has lost its connection to SLU ITS device management and needs to be re-enrolled.\n\nIn a moment you will see a Device Enrollment notification from System Settings.\n\nYou MUST select \"Enroll\" for this to work.\n\nIf you miss the notification, open System Settings and look for the Device Enrollment prompt there."
+    while [[ $attempt -lt $maxAttempts ]];
+    do
+        display_Dialog "This Mac has lost its connection to SLU ITS device management and needs to be re-enrolled.\n\nIn a moment you will see a Device Enrollment notification from System Settings.\n\nYou MUST select \"Enroll\" for this to work.\n\nIf you miss the notification, open System Settings and look for the Device Enrollment prompt there."
+        case $? in
+            0)
+                break
+                ;;
+            2)
+                ((attempt++))
+                ;;
+            *)
+                exit_Func "error"
+                ;;
+        esac
+    done
+    if [[ $attempt -ge $maxAttempts ]];
+    then
+        log_Message "$currentUser never responded to the dialog" "ERROR"
+        exit_Func "error"
+    fi
 
     precheckComplete=true
 
