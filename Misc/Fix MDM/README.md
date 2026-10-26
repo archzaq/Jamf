@@ -37,6 +37,13 @@ Example:
 bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/pathto/.ssh/key"
 ```
 
+### Collecting Logs Only
+Add `--logs-only` as a fifth argument to copy each device's log and `nohup` output to `~/Desktop/fix_MDMEnrollment_Logs/` and add its outcome to `summary.csv` without launching the enrollment script. Run it after a batch to see how each device finished, or while the script is still running on a device to see where it is.
+
+```
+bash fix_MDMEnrollment.sh 'admin' 'password' './list_of_devices.csv' "/full/pathto/.ssh/key" --logs-only
+```
+
 ## How It Works
 `fix_MDMEnrollment.sh` does all of the work, you just have to setup your environment with an SSH key and a list of devices before attempting to run this process.
 1. `fix_MDMEnrollment.sh` reads the CSV it is given and tries each machine by hostname, falling back to its IP address.
