@@ -3,8 +3,8 @@
 ##########################
 ### Author: Zac Reeves ###
 ### Created: 08-27-24  ###
-### Updated: 02-09-26  ###
-### Version: 3.1       ###
+### Updated: 11-03-26  ###
+### Version: 3.2       ###
 ##########################
 
 managementAccount="$4"
@@ -12,7 +12,9 @@ managementAccountPass="$5"
 elevatedAccount="$6"
 elevatedAccountPass=''
 readonly currentUser="$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/  { print $3 }')"
-readonly currentUserHomePath="${HOME:-/Users/${currentUser}}"
+readonly currentUserUID="$(/usr/bin/id -u "$currentUser" 2>/dev/null)"
+currentUserHomePath="$(/usr/bin/dscl . -read "/Users/${currentUser}" NFSHomeDirectory 2>/dev/null | awk '{ print $2 }')"
+readonly currentUserHomePath="${currentUserHomePath:-/Users/${currentUser}}"
 readonly logFile='/var/log/elevatedAccount_Creation.log'
 readonly outputFile="${currentUserHomePath}/Desktop/HowTo_AdminAccount.txt"
 readonly SLUIconFile='/usr/local/jamfconnect/SLU.icns'
@@ -157,7 +159,7 @@ function token_Action() {
         log_Message "Invalid token action" "ERROR"
         return 1
     fi
-    if check_SecureToken "$tokenEnableAccount";
+    if check_SecureToken "$tokenAccount";
     then
         return 0
     else
@@ -235,12 +237,32 @@ A: Yes. Open System Settings, go to Users & Groups, select the
   Feel free to keep it or delete it once you are comfortable
   with the information above.
 OOP
-    chown "$currentUser":staff "$outputFile"
+        if ! chown "$currentUser":staff "$outputFile";
+        then
+            log_Message "Unable to set ownership of output file to: \"${currentUser}\"" "WARN"
+        fi
     else
         log_Message "Unable to create information file on Desktop"
         return 1
     fi
     return 0
+}
+
+# Open a file as the currently logged in user rather than root
+function open_AsUser() {
+    local file="$1"
+    if [[ -z "$currentUserUID" ]];
+    then
+        log_Message "Unable to determine UID for: \"${currentUser}\"" "ERROR"
+        return 1
+    fi
+    if /bin/launchctl asuser "$currentUserUID" /usr/bin/sudo -u "$currentUser" /usr/bin/open "$file";
+    then
+        return 0
+    else
+        log_Message "Unable to open \"${file}\" as: \"${currentUser}\"" "ERROR"
+        return 1
+    fi
 }
 
 # AppleScript - Informing the user and giving them two choices
@@ -532,8 +554,8 @@ function main() {
     then
         if binary_Dialog "Would you like to open the HowTo_AdminAccount document created on your Desktop for further information on your Admin Account?" "Yes" "No";
         then
-            log_Message "Opening output file"
-            open "$outputFile"
+            log_Message "Opening output file as: \"${currentUser}\""
+            open_AsUser "$outputFile"
         else
             log_Message "Skipping opening of output file"
         fi
